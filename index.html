@@ -22,8 +22,8 @@
       <h2 id="lock-title" class="text-lg font-bold uppercase tracking-wide">Enter PIN</h2>
       <p id="lock-subtitle" class="text-xs text-slate-400">This app is locked on this device.</p>
 
-      <input id="lock-pin-input" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="••••" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false" class="w-full text-center text-2xl tracking-[0.5em] p-3 rounded-lg bg-slate-700 border border-slate-600 text-white focus:outline-none">
-      <input id="lock-pin-confirm" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="Confirm PIN" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false" class="w-full text-center text-lg tracking-[0.4em] p-3 rounded-lg bg-slate-700 border border-slate-600 text-white focus:outline-none" style="display:none;">
+      <input id="lock-pin-input" type="text" name="app-code-1" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="••••" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" style="-webkit-text-security: disc; text-security: disc;" class="w-full text-center text-2xl tracking-[0.5em] p-3 rounded-lg bg-slate-700 border border-slate-600 text-white focus:outline-none">
+      <input id="lock-pin-confirm" type="text" name="app-code-2" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="Confirm PIN" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" style="-webkit-text-security: disc; text-security: disc; display:none;" class="w-full text-center text-lg tracking-[0.4em] p-3 rounded-lg bg-slate-700 border border-slate-600 text-white focus:outline-none">
 
       <p id="lock-error" class="text-xs text-rose-400 h-3"></p>
 
