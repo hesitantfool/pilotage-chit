@@ -3,7 +3,7 @@
 // re-runs install, and refreshes the cached copies. Forgetting to bump this
 // is why updates can silently fail to reach devices that already have the
 // app installed/cached.
-const CACHE_NAME = 'pnorth-pilotage-v2';
+const CACHE_NAME = 'pnorth-pilotage-v3';
 
 const APP_SHELL = [
   './',
@@ -14,7 +14,8 @@ const APP_SHELL = [
   './js/jspdf.umd.min.js',
   './manifest.json',
   './icons/icon-192.png',
-  './icons/icon-512.png'
+  './icons/icon-512.png',
+  './icons/ports-north-logo.png'
 ];
 
 // Pre-cache every app shell file so the very first offline load still works.

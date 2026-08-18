@@ -49,7 +49,9 @@
   <!-- App Header -->
   <header class="bg-[#0a3d62] p-4 shadow-lg sticky top-0 z-50 flex justify-between items-center border-b border-blue-400">
     <div class="flex items-center gap-2">
-      <div class="w-6 h-6 rounded-full bg-white flex items-center justify-center text-[#0a3d62] font-black text-xs">▲</div>
+      <div class="w-8 h-8 rounded-full bg-white flex items-center justify-center overflow-hidden">
+        <img src="icons/ports-north-logo.png" alt="Ports North" class="w-7 h-7 object-contain">
+      </div>
       <div class="leading-tight">
         <h1 class="text-md font-bold tracking-wider uppercase">Ports North Form</h1>
         <span id="port-badge" class="text-[10px] text-blue-300 font-semibold tracking-wide block">--</span>
@@ -1165,15 +1167,18 @@
         doc.setFont("Helvetica", "normal"); doc.setFontSize(10);
         doc.text(`Port: ${getValue('port') || 'Ports North'}`, 12, 22);
 
-        // Logo asset - awaited so it's fully decoded before jsPDF uses it.
-        // "PORTS NORTH" text always renders top-right; if a real logo image
-        // is available it's drawn as well, above the text.
-        doc.setFont("Helvetica", "bold"); doc.setFontSize(16); doc.text("PORTS NORTH", 198, 16, { align: "right" });
-        const logoImg = await loadImageAsync('image_2bdbd6.png');
+        // Logo asset - the real Ports North logo, bundled locally so it's
+        // always available offline. Falls back to bold text only in the
+        // unlikely case the image can't be decoded.
+        const logoImg = await loadImageAsync('icons/ports-north-logo.png');
         if (logoImg) {
           try {
-            doc.addImage(logoImg, 'PNG', 156, 6, 42, 8);
-          } catch (e) { /* text label above already covers this */ }
+            doc.addImage(logoImg, 'PNG', 178, 6, 20, 20);
+          } catch (e) {
+            doc.setFont("Helvetica", "bold"); doc.setFontSize(16); doc.text("PORTS NORTH", 198, 16, { align: "right" });
+          }
+        } else {
+          doc.setFont("Helvetica", "bold"); doc.setFontSize(16); doc.text("PORTS NORTH", 198, 16, { align: "right" });
         }
 
         let rowH = 7; 
