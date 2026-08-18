@@ -22,8 +22,8 @@
       <h2 id="lock-title" class="text-lg font-bold uppercase tracking-wide">Enter PIN</h2>
       <p id="lock-subtitle" class="text-xs text-slate-400">This app is locked on this device.</p>
 
-      <input id="lock-pin-input" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="••••" class="w-full text-center text-2xl tracking-[0.5em] p-3 rounded-lg bg-slate-700 border border-slate-600 text-white focus:outline-none">
-      <input id="lock-pin-confirm" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="Confirm PIN" class="w-full text-center text-lg tracking-[0.4em] p-3 rounded-lg bg-slate-700 border border-slate-600 text-white focus:outline-none" style="display:none;">
+      <input id="lock-pin-input" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="••••" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false" class="w-full text-center text-2xl tracking-[0.5em] p-3 rounded-lg bg-slate-700 border border-slate-600 text-white focus:outline-none">
+      <input id="lock-pin-confirm" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="Confirm PIN" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false" class="w-full text-center text-lg tracking-[0.4em] p-3 rounded-lg bg-slate-700 border border-slate-600 text-white focus:outline-none" style="display:none;">
 
       <p id="lock-error" class="text-xs text-rose-400 h-3"></p>
 
@@ -582,6 +582,9 @@
       document.getElementById('lock-error').textContent = '';
       pinInput.value = '';
       confirmInput.value = '';
+      // Belt-and-braces: some mobile browsers autofill password-type fields
+      // a beat after the page settles, so clear again shortly after too.
+      setTimeout(() => { pinInput.value = ''; confirmInput.value = ''; }, 300);
 
       if (lockMode === 'setup') {
         title.textContent = 'Set a PIN';
