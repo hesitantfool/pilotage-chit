@@ -32,6 +32,20 @@
     </div>
   </div>
 
+  <!-- IN-APP DIALOG (replaces native prompt/confirm/alert, which don't
+       reliably show an input box when the app is running installed/standalone) -->
+  <div id="app-modal" class="fixed inset-0 z-[90] bg-black/60 flex items-center justify-center p-6" style="display:none;">
+    <div class="w-full max-w-xs bg-slate-800 border border-slate-700 rounded-2xl p-5 space-y-3 text-center">
+      <h3 id="app-modal-title" class="text-base font-bold uppercase tracking-wide"></h3>
+      <p id="app-modal-message" class="text-xs text-slate-300"></p>
+      <input id="app-modal-input" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" class="w-full p-2.5 rounded-lg bg-slate-700 border border-slate-600 text-white text-sm text-center focus:outline-none" style="display:none;">
+      <div class="flex gap-2 pt-1">
+        <button id="app-modal-cancel" type="button" class="flex-1 py-2 rounded-lg bg-slate-600 font-bold text-xs uppercase">Cancel</button>
+        <button id="app-modal-ok" type="button" class="flex-1 py-2 rounded-lg bg-blue-600 font-bold text-xs uppercase">OK</button>
+      </div>
+    </div>
+  </div>
+
   <!-- App Header -->
   <header class="bg-[#0a3d62] p-4 shadow-lg sticky top-0 z-50 flex justify-between items-center border-b border-blue-400">
     <div class="flex items-center gap-2">
@@ -547,6 +561,59 @@
     // that's picked up unlocked. There is no server, so it cannot be a real
     // authentication system - "Forgot PIN" resets it from the same screen
     // by design, since there's nothing to recover it against.
+    // ---- In-app dialog (replaces native prompt/confirm/alert) ----
+    // Native browser prompt()/confirm()/alert() popups don't reliably show
+    // a usable text-input box once this app is running installed/standalone
+    // (no browser chrome for them to attach to on a lot of Android
+    // browsers). This is a self-contained replacement that always works.
+    function showAppModal({ title = '', message = '', hasInput = false, placeholder = '', confirmLabel = 'OK', cancelLabel = 'Cancel' }) {
+      return new Promise(resolve => {
+        const overlay = document.getElementById('app-modal');
+        document.getElementById('app-modal-title').textContent = title;
+        document.getElementById('app-modal-message').textContent = message;
+        const input = document.getElementById('app-modal-input');
+        const okBtn = document.getElementById('app-modal-ok');
+        const cancelBtn = document.getElementById('app-modal-cancel');
+
+        input.style.display = hasInput ? 'block' : 'none';
+        input.value = '';
+        input.placeholder = placeholder;
+        okBtn.textContent = confirmLabel;
+        cancelBtn.style.display = cancelLabel ? 'inline-block' : 'none';
+        cancelBtn.textContent = cancelLabel || '';
+
+        overlay.style.display = 'flex';
+        if (hasInput) setTimeout(() => input.focus(), 50);
+
+        function cleanup(result) {
+          overlay.style.display = 'none';
+          okBtn.removeEventListener('click', onOk);
+          cancelBtn.removeEventListener('click', onCancel);
+          input.removeEventListener('keydown', onKeydown);
+          resolve(result);
+        }
+        function onOk() { cleanup(hasInput ? (input.value.trim() || null) : true); }
+        function onCancel() { cleanup(null); }
+        function onKeydown(e) { if (e.key === 'Enter') onOk(); }
+
+        okBtn.addEventListener('click', onOk);
+        cancelBtn.addEventListener('click', onCancel);
+        if (hasInput) input.addEventListener('keydown', onKeydown);
+      });
+    }
+
+    function showAppAlert(message, title = '') {
+      return showAppModal({ title, message, hasInput: false, confirmLabel: 'OK', cancelLabel: null });
+    }
+
+    function showAppConfirm(message, title = '') {
+      return showAppModal({ title, message, hasInput: false, confirmLabel: 'Confirm', cancelLabel: 'Cancel' });
+    }
+
+    function showAppPrompt(message, title = '', placeholder = '') {
+      return showAppModal({ title, message, hasInput: true, placeholder, confirmLabel: 'OK', cancelLabel: 'Cancel' });
+    }
+
     const PIN_HASH_KEY = 'pnorth_v21_pin_hash';
     let lockMode = 'unlock'; // 'unlock' | 'setup'
 
@@ -643,7 +710,7 @@
     }
 
     async function handleForgotPin() {
-      if (!confirm('This clears the saved PIN on this device. Your certificates, vessels and pilots are kept - only the lock itself resets. Continue?')) return;
+      if (!(await showAppConfirm('This clears the saved PIN on this device. Your certificates, vessels and pilots are kept - only the lock itself resets. Continue?', 'Reset PIN'))) return;
       try { await localforage.removeItem(PIN_HASH_KEY); } catch (e) {}
       lockMode = 'setup';
       showLockScreen();
@@ -658,21 +725,21 @@
     async function promptChangePin() {
       let savedHash = null;
       try { savedHash = await localforage.getItem(PIN_HASH_KEY); } catch (e) {}
-      if (!savedHash) { alert('No PIN is set yet - tap the lock icon to set one.'); return; }
+      if (!savedHash) { await showAppAlert('No PIN is set yet - tap the lock icon to set one.', 'Change PIN'); return; }
 
-      const current = prompt('Enter current PIN:');
+      const current = await showAppPrompt('Enter current PIN:', 'Change PIN', 'Current PIN');
       if (current === null) return;
       const currentHash = await sha256Hex(current.trim());
-      if (currentHash !== savedHash) { alert('Incorrect current PIN.'); return; }
+      if (currentHash !== savedHash) { await showAppAlert('Incorrect current PIN.', 'Change PIN'); return; }
 
-      const next = prompt('Enter new PIN (4-6 digits):');
-      if (!next || !/^\d{4,6}$/.test(next.trim())) { alert('PIN must be 4-6 digits. No changes made.'); return; }
-      const confirmNext = prompt('Confirm new PIN:');
-      if (next.trim() !== (confirmNext || '').trim()) { alert('PINs did not match. No changes made.'); return; }
+      const next = await showAppPrompt('Enter new PIN (4-6 digits):', 'Change PIN', 'New PIN');
+      if (!next || !/^\d{4,6}$/.test(next.trim())) { await showAppAlert('PIN must be 4-6 digits. No changes made.', 'Change PIN'); return; }
+      const confirmNext = await showAppPrompt('Confirm new PIN:', 'Change PIN', 'Confirm new PIN');
+      if (next.trim() !== (confirmNext || '').trim()) { await showAppAlert('PINs did not match. No changes made.', 'Change PIN'); return; }
 
       const newHash = await sha256Hex(next.trim());
       try { await localforage.setItem(PIN_HASH_KEY, newHash); } catch (e) {}
-      alert('PIN updated.');
+      await showAppAlert('PIN updated.', 'Change PIN');
     }
 
     window.addEventListener('DOMContentLoaded', async () => {
@@ -904,7 +971,7 @@
     }
 
     async function addNewVesselPrompt() {
-      const v = prompt("Enter vessel name to save (this stores the current IMO / GRT / DWT / LOA / Beam / Flag / Propulsion fields against it, so selecting this vessel next time fills them in automatically):");
+      const v = await showAppPrompt("This stores the current IMO / GRT / DWT / LOA / Beam / Flag / Propulsion fields against this vessel, so selecting it next time fills them in automatically.", "Save Vessel", "Vessel name");
       if (!v || !v.trim()) return;
       const clean = v.trim();
 
@@ -921,7 +988,7 @@
 
       const existingIdx = vesselList.findIndex(x => x.name.toLowerCase() === clean.toLowerCase());
       if (existingIdx >= 0) {
-        if (!confirm(`"${clean}" is already saved. Update its stored details with the current form values?`)) return;
+        if (!(await showAppConfirm(`"${clean}" is already saved. Update its stored details with the current form values?`, "Update Vessel"))) return;
         vesselList[existingIdx] = profile;
       } else {
         vesselList.push(profile);
@@ -936,7 +1003,7 @@
     async function deleteActiveVessel() {
       const el = document.getElementById('vesselName');
       if(!el || !el.value) return;
-      if(confirm(`Remove "${el.value}" from saved alphabetized list?`)) {
+      if(await showAppConfirm(`Remove "${el.value}" from saved alphabetized list?`, "Remove Vessel")) {
         vesselList = vesselList.filter(item => item.name !== el.value);
         try { await localforage.setItem('pnorth_v21_vessels', vesselList); } catch(e) {}
         renderAlphabeticalVessels();
@@ -945,7 +1012,7 @@
     }
 
     async function addNewListItem(id, typeName) {
-      const v = prompt(`Add custom option for ${typeName}:`);
+      const v = await showAppPrompt(`Add a custom option for ${typeName}.`, `Add ${typeName}`, typeName);
       if (!v || !v.trim()) return;
       const clean = v.trim();
 
@@ -1334,7 +1401,7 @@
 
         doc.save(formattedFileName);
       } catch (err) {
-        alert("Render Pipeline Crash: " + err.message);
+        showAppAlert("Render Pipeline Crash: " + err.message, "PDF Generation Error");
       }
     }
     // Register the service worker so the app shell (HTML/CSS/JS/icons) is
