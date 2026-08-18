@@ -1,4 +1,9 @@
-const CACHE_NAME = 'pnorth-pilotage-v1';
+// Bump this version string every time index.html (or any app-shell file)
+// changes, so the browser detects the service worker itself has changed,
+// re-runs install, and refreshes the cached copies. Forgetting to bump this
+// is why updates can silently fail to reach devices that already have the
+// app installed/cached.
+const CACHE_NAME = 'pnorth-pilotage-v2';
 
 const APP_SHELL = [
   './',
@@ -30,12 +35,32 @@ self.addEventListener('activate', event => {
   );
 });
 
-// Cache-first for the app shell: instant load, works offline. Anything not
-// pre-cached falls back to the network, and a successful response for a
-// same-origin GET is stashed for next time too.
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
 
+  const isAppShellDoc =
+    event.request.mode === 'navigate' ||
+    event.request.url.endsWith('/index.html') ||
+    event.request.url.endsWith('/');
+
+  if (isAppShellDoc) {
+    // Network-first for the HTML shell itself: whenever there's a
+    // connection, always fetch the latest version and refresh the cache
+    // with it, so updates are visible the moment the app is reopened.
+    // Only falls back to whatever was last cached when truly offline.
+    event.respondWith(
+      fetch(event.request).then(response => {
+        const clone = response.clone();
+        caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+        return response;
+      }).catch(() => caches.match(event.request).then(cached => cached || caches.match('./index.html')))
+    );
+    return;
+  }
+
+  // Cache-first for everything else (vendored JS/CSS libraries, icons) -
+  // these rarely change, and this is what makes the app load instantly
+  // offline once it's been opened at least once.
   event.respondWith(
     caches.match(event.request).then(cached => {
       if (cached) return cached;
@@ -46,10 +71,7 @@ self.addEventListener('fetch', event => {
           caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
         }
         return response;
-      }).catch(() => {
-        // Offline and not cached - if it's a navigation, fall back to the app shell.
-        if (event.request.mode === 'navigate') return caches.match('./index.html');
-      });
+      }).catch(() => {});
     })
   );
 });
