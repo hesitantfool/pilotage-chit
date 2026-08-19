@@ -3,7 +3,7 @@
 // re-runs install, and refreshes the cached copies. Forgetting to bump this
 // is why updates can silently fail to reach devices that already have the
 // app installed/cached.
-const CACHE_NAME = 'pnorth-pilotage-v3';
+const CACHE_NAME = 'pnorth-pilotage-v4';
 
 const APP_SHELL = [
   './',

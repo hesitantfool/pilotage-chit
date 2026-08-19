@@ -473,7 +473,10 @@
             <button type="button" onclick="masterPad.clear()" class="text-xs text-rose-400 font-medium">Clear</button>
             <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 text-left">Signature of Master</span>
           </div>
-          <canvas id="master-signature" class="w-full h-24 border border-slate-600 rounded-lg bg-slate-50 touch-none"></canvas>
+          <div class="relative">
+            <canvas id="master-signature" class="w-full h-24 border border-slate-600 rounded-lg bg-slate-50"></canvas>
+            <button type="button" id="master-signature-lock-btn" onclick="toggleSignatureLock('master-signature')" class="absolute top-1.5 right-1.5 text-[10px] font-bold px-2 py-1 rounded-full bg-slate-800/80 text-slate-200 border border-slate-500">🔒 Tap to Sign</button>
+          </div>
         </div>
 
         <div>
@@ -483,7 +486,10 @@
               Signature of Pilot: <span id="pilot-signature-label" class="text-blue-400 ml-1">BARCHETTI</span>
             </div>
           </div>
-          <canvas id="pilot-signature" class="w-full h-24 border border-slate-600 rounded-lg bg-slate-50 touch-none"></canvas>
+          <div class="relative">
+            <canvas id="pilot-signature" class="w-full h-24 border border-slate-600 rounded-lg bg-slate-50"></canvas>
+            <button type="button" id="pilot-signature-lock-btn" onclick="toggleSignatureLock('pilot-signature')" class="absolute top-1.5 right-1.5 text-[10px] font-bold px-2 py-1 rounded-full bg-slate-800/80 text-slate-200 border border-slate-500">🔒 Tap to Sign</button>
+          </div>
         </div>
       </div>
     </section>
@@ -819,7 +825,38 @@
       canvas.width = canvas.offsetWidth * r;
       canvas.height = canvas.offsetHeight * r;
       canvas.getContext("2d").scale(r, r);
-      assign(new SignaturePad(canvas, { backgroundColor: 'rgb(248, 250, 252)' }));
+      const pad = new SignaturePad(canvas, { backgroundColor: 'rgb(248, 250, 252)' });
+      pad.off(); // start locked - page scroll works normally until unlocked
+      assign(pad);
+    }
+
+    // Signature pads capture every touch on the canvas so signature_pad can
+    // draw, which also blocks the page from scrolling past them. Locked by
+    // default: pad.off() stops it capturing touches and touch-none is
+    // removed so a normal scroll gesture passes straight through. Tapping
+    // the button unlocks it (pad.on() + touch-none) so drawing works, at
+    // the cost of not being able to scroll from directly on the pad while
+    // it's unlocked - tap it again to lock and resume scrolling.
+    function toggleSignatureLock(canvasId) {
+      const pad = canvasId === 'master-signature' ? masterPad : pilotPad;
+      const canvas = document.getElementById(canvasId);
+      const btn = document.getElementById(canvasId + '-lock-btn');
+      if (!pad || !canvas || !btn) return;
+
+      const isLocked = !canvas.classList.contains('touch-none');
+      if (isLocked) {
+        canvas.classList.add('touch-none');
+        pad.on();
+        btn.textContent = '🔓 Signing - Tap to Lock';
+        btn.classList.add('bg-emerald-600/90');
+        btn.classList.remove('bg-slate-800/80');
+      } else {
+        canvas.classList.remove('touch-none');
+        pad.off();
+        btn.textContent = '🔒 Tap to Sign';
+        btn.classList.remove('bg-emerald-600/90');
+        btn.classList.add('bg-slate-800/80');
+      }
     }
 
     function renderSelectMenuOptions(id, arr) {
