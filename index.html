@@ -53,6 +53,10 @@
     /* ---- Theme toggle button (header) ---- */
     #theme-toggle { line-height: 1; }
 
+    /* Build/version tag, tucked under the title — smaller than any
+       compiled Tailwind text size, so it's plain CSS. */
+    .header-version { display: block; font-size: 9px; color: #7ea8c4; opacity: 0.7; letter-spacing: .03em; }
+
     /* ---- Bottom tab bar: horizontally scrollable so items keep a
        comfortable fixed width instead of being squeezed to fit ---- */
     #bottom-tabs {
@@ -124,12 +128,12 @@
         <img src="icons/ports-north-logo.png" alt="Ports North" class="w-7 h-7 object-contain">
       </div>
       <div class="leading-tight">
-        <h1 class="text-lg font-bold tracking-wider uppercase">Ports North Form</h1>
+        <h1 class="text-lg font-bold tracking-wider uppercase">Pilotage Certificate</h1>
         <span id="port-badge" class="text-xs text-blue-300 font-semibold tracking-wide block">--</span>
+        <span class="header-version">v5.0</span>
       </div>
     </div>
     <div class="flex items-center gap-1">
-      <span class="bg-emerald-600 text-xs px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">Mobile Grid V21</span>
       <button type="button" onclick="startNewChit()" title="Start a new certificate (clears fields)" class="bg-slate-700 hover:bg-slate-600 text-xs px-2 py-1 rounded-full font-bold">🆕</button>
       <button id="theme-toggle" type="button" onclick="toggleTheme()" title="Toggle light/dark theme" class="bg-slate-700 hover:bg-slate-600 text-xs px-2 py-1 rounded-full font-bold">🌙</button>
       <button type="button" onclick="promptChangePin()" title="Change PIN" class="bg-slate-700 hover:bg-slate-600 text-xs px-2 py-1 rounded-full font-bold">⚙️</button>
