@@ -230,7 +230,7 @@
       <div id="specs-drawer" class="space-y-3">
         <div>
           <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Vessel Name</label>
-          <select id="vesselNameSpecs" onchange="onVesselSelect('vesselNameSpecs')" class="w-full p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-base focus:outline-none text-right font-bold"></select>
+          <input type="text" id="vesselNameSpecs" placeholder="Enter vessel name" class="w-full p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-base focus:outline-none text-right font-bold">
           <div class="flex gap-1 mt-1">
             <button type="button" onclick="switchTab('voyage')" class="flex-1 py-2 bg-slate-600 rounded-lg text-sm font-bold uppercase">← Cancel</button>
             <button type="button" onclick="saveVesselDetails()" class="flex-1 py-2 bg-blue-600 rounded-lg text-sm font-bold text-white uppercase">💾 Save</button>
@@ -1026,17 +1026,19 @@
       if(el) el.innerHTML = arr.map(v => `<option value="${v}">${v === "" ? "-- None --" : v}</option>`).join('');
     }
 
-    // Vessel name appears as two selects (Voyage tab and Vessel tab) that
-    // must always show the same selection.
-    const VESSEL_NAME_SELECT_IDS = ['vesselName', 'vesselNameSpecs'];
+    // Vessel name appears twice: a <select> of saved vessels on the Voyage
+    // tab, and a plain text field on the Vessel tab (needs to be free text
+    // so a brand new vessel's name can actually be typed there). Both must
+    // always show the same value.
+    const VESSEL_NAME_FIELD_IDS = ['vesselName', 'vesselNameSpecs'];
 
     function renderAlphabeticalVessels() {
       vesselList.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
-      VESSEL_NAME_SELECT_IDS.forEach(id => renderSelectMenuOptions(id, ["", ...vesselList.map(v => v.name)]));
+      renderSelectMenuOptions('vesselName', ["", ...vesselList.map(v => v.name)]);
     }
 
     function setVesselNameSelects(name) {
-      VESSEL_NAME_SELECT_IDS.forEach(id => {
+      VESSEL_NAME_FIELD_IDS.forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = name;
       });
