@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,6 +12,69 @@
   <script src="js/signature_pad.min.js"></script>
   <script src="js/localforage.min.js"></script>
   <script src="js/jspdf.umd.min.js"></script>
+  <style>
+    /* ---- Light theme overrides ----
+       The compiled css/tailwind.css is a purged build containing only the
+       classes already used in this file, and this box has no Node/Tailwind
+       CLI to regenerate it. So instead of inventing new Tailwind utility
+       classes (which wouldn't render), the light theme is implemented as
+       plain CSS overrides of the EXISTING dark-theme Tailwind classes,
+       scoped to `main` so the lock screen, the in-app modal, the header,
+       and the always-light signature canvases/lock buttons are deliberately
+       left untouched in both themes (header stays brand navy; lock/modal
+       stay their current dark styling; signature areas need fixed contrast
+       against an ink-catching light canvas regardless of theme). */
+    header { color: #ffffff; }
+
+    [data-theme="light"] body.bg-slate-900 { background-color: #f4f6f9; }
+    [data-theme="light"] body.text-gray-100 { color: #12161b; }
+
+    [data-theme="light"] main .bg-slate-800 { background-color: #ffffff; }
+    [data-theme="light"] main .border-slate-700 { border-color: #dde3ea; }
+    [data-theme="light"] main .bg-slate-700 { background-color: #ffffff; }
+    [data-theme="light"] main .border-slate-600 { border-color: #c7ccd6; }
+    [data-theme="light"] main .bg-slate-600 { background-color: #e7ebef; }
+    [data-theme="light"] main .text-slate-400 { color: #5b6572; }
+    [data-theme="light"] main .text-slate-500 { color: #4b5563; }
+    [data-theme="light"] main .text-slate-300 { color: #374151; }
+    [data-theme="light"] main .text-white:not(.bg-blue-600) { color: #12161b; }
+    [data-theme="light"] main .text-blue-400 { color: #0a3d62; }
+    [data-theme="light"] main .text-blue-300 { color: #1d4ed8; }
+    /* Selected radio "pill" state keeps a dark navy background in both
+       themes (see below) but its label text otherwise inherits the new
+       dark body text color in light mode, which would be unreadable
+       against that dark pill — force it back to white. */
+    [data-theme="light"] main .has-\[\:checked\]\:bg-blue-900:has(:checked),
+    [data-theme="light"] main .has-\[\:checked\]\:bg-blue-950:has(:checked) { color: #ffffff; }
+
+    /* ---- Theme toggle button (header) ---- */
+    #theme-toggle { line-height: 1; }
+
+    /* ---- Bottom tab bar ---- */
+    #bottom-tabs {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 70;
+      display: flex; border-top: 1px solid var(--tabbar-border, #334155);
+    }
+    [data-theme="light"] #bottom-tabs { --tabbar-border: #dde3ea; }
+    .tab-btn {
+      flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 2px; padding: 6px 2px 8px; background: transparent; border: none;
+      color: #94a3b8; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em;
+    }
+    .tab-btn.active { color: #60a5fa; }
+    [data-theme="light"] .tab-btn { color: #5b6572; }
+    [data-theme="light"] .tab-btn.active { color: #0a3d62; }
+    .tab-icon { font-size: 18px; line-height: 1; }
+
+    /* ---- Fixed action-button run block, sits above the tab bar ---- */
+    #run-block { position: fixed; left: 0; right: 0; bottom: 54px; z-index: 65; padding: 8px 12px; }
+
+    /* #run-block and #bottom-tabs are siblings of <main>, not descendants,
+       so the `main`-scoped overrides above don't reach them — theme them
+       directly here instead. */
+    [data-theme="light"] #run-block.bg-slate-900 { background-color: #f4f6f9; }
+    [data-theme="light"] #bottom-tabs.bg-slate-800 { background-color: #ffffff; }
+  </style>
 </head>
 <body class="bg-slate-900 text-gray-100 font-sans min-h-screen pb-12 select-none">
 
@@ -20,15 +83,15 @@
     <div class="w-full max-w-xs bg-slate-800 border border-slate-700 rounded-2xl p-6 space-y-4 text-center">
       <div class="text-3xl">🔒</div>
       <h2 id="lock-title" class="text-lg font-bold uppercase tracking-wide">Enter PIN</h2>
-      <p id="lock-subtitle" class="text-xs text-slate-400">This app is locked on this device.</p>
+      <p id="lock-subtitle" class="text-sm text-slate-400">This app is locked on this device.</p>
 
       <input id="lock-pin-input" type="text" name="app-code-1" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="••••" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" style="-webkit-text-security: disc; text-security: disc;" class="w-full text-center text-2xl tracking-[0.5em] p-3 rounded-lg bg-slate-700 border border-slate-600 text-white focus:outline-none">
       <input id="lock-pin-confirm" type="text" name="app-code-2" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="Confirm PIN" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" style="-webkit-text-security: disc; text-security: disc; display:none;" class="w-full text-center text-lg tracking-[0.4em] p-3 rounded-lg bg-slate-700 border border-slate-600 text-white focus:outline-none">
 
-      <p id="lock-error" class="text-xs text-rose-400 h-3"></p>
+      <p id="lock-error" class="text-sm text-rose-400 h-3"></p>
 
-      <button id="lock-submit-btn" type="button" onclick="handleLockSubmit()" class="w-full py-2.5 rounded-lg bg-blue-600 font-bold text-sm uppercase tracking-wide">Unlock</button>
-      <button id="lock-forgot-btn" type="button" onclick="handleForgotPin()" class="text-[11px] text-slate-500 underline">Forgot PIN? Reset app lock</button>
+      <button id="lock-submit-btn" type="button" onclick="handleLockSubmit()" class="w-full py-2.5 rounded-lg bg-blue-600 font-bold text-base uppercase tracking-wide">Unlock</button>
+      <button id="lock-forgot-btn" type="button" onclick="handleForgotPin()" class="text-xs text-slate-500 underline">Forgot PIN? Reset app lock</button>
     </div>
   </div>
 
@@ -37,11 +100,11 @@
   <div id="app-modal" class="fixed inset-0 z-[90] bg-black/60 flex items-center justify-center p-6" style="display:none;">
     <div class="w-full max-w-xs bg-slate-800 border border-slate-700 rounded-2xl p-5 space-y-3 text-center">
       <h3 id="app-modal-title" class="text-base font-bold uppercase tracking-wide"></h3>
-      <p id="app-modal-message" class="text-xs text-slate-300"></p>
-      <input id="app-modal-input" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" class="w-full p-2.5 rounded-lg bg-slate-700 border border-slate-600 text-white text-sm text-center focus:outline-none" style="display:none;">
+      <p id="app-modal-message" class="text-sm text-slate-300"></p>
+      <input id="app-modal-input" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" class="w-full p-2.5 rounded-lg bg-slate-700 border border-slate-600 text-white text-base text-center focus:outline-none" style="display:none;">
       <div class="flex gap-2 pt-1">
-        <button id="app-modal-cancel" type="button" class="flex-1 py-2 rounded-lg bg-slate-600 font-bold text-xs uppercase">Cancel</button>
-        <button id="app-modal-ok" type="button" class="flex-1 py-2 rounded-lg bg-blue-600 font-bold text-xs uppercase">OK</button>
+        <button id="app-modal-cancel" type="button" class="flex-1 py-2 rounded-lg bg-slate-600 font-bold text-sm uppercase">Cancel</button>
+        <button id="app-modal-ok" type="button" class="flex-1 py-2 rounded-lg bg-blue-600 font-bold text-sm uppercase">OK</button>
       </div>
     </div>
   </div>
@@ -53,46 +116,47 @@
         <img src="icons/ports-north-logo.png" alt="Ports North" class="w-7 h-7 object-contain">
       </div>
       <div class="leading-tight">
-        <h1 class="text-md font-bold tracking-wider uppercase">Ports North Form</h1>
-        <span id="port-badge" class="text-[10px] text-blue-300 font-semibold tracking-wide block">--</span>
+        <h1 class="text-lg font-bold tracking-wider uppercase">Ports North Form</h1>
+        <span id="port-badge" class="text-xs text-blue-300 font-semibold tracking-wide block">--</span>
       </div>
     </div>
     <div class="flex items-center gap-1">
-      <span class="bg-emerald-600 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">Mobile Grid V21</span>
-      <button type="button" onclick="promptChangePin()" title="Change PIN" class="bg-slate-700 hover:bg-slate-600 text-[10px] px-2 py-1 rounded-full font-bold">⚙️</button>
+      <span class="bg-emerald-600 text-xs px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">Mobile Grid V21</span>
+      <button id="theme-toggle" type="button" onclick="toggleTheme()" title="Toggle light/dark theme" class="bg-slate-700 hover:bg-slate-600 text-xs px-2 py-1 rounded-full font-bold">🌙</button>
+      <button type="button" onclick="promptChangePin()" title="Change PIN" class="bg-slate-700 hover:bg-slate-600 text-xs px-2 py-1 rounded-full font-bold">⚙️</button>
     </div>
   </header>
 
-  <main class="max-w-xl mx-auto p-3 space-y-4">
+  <main class="max-w-xl mx-auto p-3 space-y-4" style="padding-bottom: 130px;">
 
     <!-- SECTION 1: CORE VOYAGE LOGISTICS -->
-    <section class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-md space-y-3">
-      <h2 class="text-blue-400 font-bold text-xs uppercase tracking-wider border-b border-slate-700 pb-1">1. Voyage & Core Identification</h2>
+    <section id="tab-voyage" class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-md space-y-3">
+      <h2 class="text-blue-400 font-bold text-sm uppercase tracking-wider border-b border-slate-700 pb-1">1. Voyage & Core Identification</h2>
 
       <div>
-        <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Port</label>
-        <select id="port" onchange="onPortChange()" class="w-full p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-sm focus:outline-none text-right font-bold"></select>
+        <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Port</label>
+        <select id="port" onchange="onPortChange()" class="w-full p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-base focus:outline-none text-right font-bold"></select>
       </div>
 
       <div class="space-y-2 bg-slate-750 p-2.5 rounded-lg border border-slate-700">
         <div class="flex justify-between items-center">
-          <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Assigned Pilots</label>
-          <button type="button" onclick="addNewListItem('pilotName1', 'Pilot Roster')" class="text-[10px] bg-slate-600 px-2 py-0.5 rounded font-bold text-white">+ Add Pilot Name</button>
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-400">Assigned Pilots</label>
+          <button type="button" onclick="addNewListItem('pilotName1', 'Pilot Roster')" class="text-xs bg-slate-600 px-2 py-0.5 rounded font-bold text-white">+ Add Pilot Name</button>
         </div>
         <div class="space-y-1.5">
           <div class="flex items-center gap-2">
-            <span class="text-[10px] text-blue-400 font-bold w-16 text-left">Pilot 1*</span>
-            <select id="pilotName1" onchange="syncPilotLabel(this.value)" class="flex-1 p-2 rounded bg-slate-700 border border-slate-600 text-white text-xs focus:outline-none text-right"></select>
+            <span class="text-xs text-blue-400 font-bold w-16 text-left">Pilot 1*</span>
+            <select id="pilotName1" onchange="syncPilotLabel(this.value)" class="flex-1 p-2 rounded bg-slate-700 border border-slate-600 text-white text-sm focus:outline-none text-right"></select>
           </div>
           <div class="flex items-center gap-2">
-            <span class="text-[10px] text-slate-400 font-medium w-16 text-left">Pilot 2</span>
-            <select id="pilotName2" class="flex-1 p-2 rounded bg-slate-700 border border-slate-600 text-white text-xs focus:outline-none text-right">
+            <span class="text-xs text-slate-400 font-medium w-16 text-left">Pilot 2</span>
+            <select id="pilotName2" class="flex-1 p-2 rounded bg-slate-700 border border-slate-600 text-white text-sm focus:outline-none text-right">
               <option value="">-- None --</option>
             </select>
           </div>
           <div class="flex items-center gap-2">
-            <span class="text-[10px] text-slate-400 font-medium w-16 text-left">Pilot 3</span>
-            <select id="pilotName3" class="flex-1 p-2 rounded bg-slate-700 border border-slate-600 text-white text-xs focus:outline-none text-right">
+            <span class="text-xs text-slate-400 font-medium w-16 text-left">Pilot 3</span>
+            <select id="pilotName3" class="flex-1 p-2 rounded bg-slate-700 border border-slate-600 text-white text-sm focus:outline-none text-right">
               <option value="">-- None --</option>
             </select>
           </div>
@@ -101,163 +165,160 @@
 
       <div class="grid grid-cols-2 gap-2">
         <div>
-          <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Date</label>
-          <input type="date" id="date" class="w-full p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-sm focus:outline-none text-right">
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Date</label>
+          <input type="date" id="date" class="w-full p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-base focus:outline-none text-right">
         </div>
         <div>
-          <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Movement Type</label>
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Movement Type</label>
           <div class="grid grid-cols-3 gap-1">
-            <label class="flex items-center justify-center py-2 border border-slate-600 rounded-lg bg-slate-700 text-xs font-bold cursor-pointer has-[:checked]:bg-blue-900 has-[:checked]:border-blue-500"><input type="radio" name="movement" value="ARR" checked onclick="toggleRemLogic('ARR')" class="sr-only"> ARR</label>
-            <label class="flex items-center justify-center py-2 border border-slate-600 rounded-lg bg-slate-700 text-xs font-bold cursor-pointer has-[:checked]:bg-blue-900 has-[:checked]:border-blue-500"><input type="radio" name="movement" value="DEP" onclick="toggleRemLogic('DEP')" class="sr-only"> DEP</label>
-            <label class="flex items-center justify-center py-2 border border-slate-600 rounded-lg bg-slate-700 text-xs font-bold cursor-pointer has-[:checked]:bg-blue-900 has-[:checked]:border-blue-500"><input type="radio" name="movement" value="REM" onclick="toggleRemLogic('REM')" class="sr-only"> REM</label>
+            <label class="flex items-center justify-center py-2 border border-slate-600 rounded-lg bg-slate-700 text-sm font-bold cursor-pointer has-[:checked]:bg-blue-900 has-[:checked]:border-blue-500"><input type="radio" name="movement" value="ARR" checked onclick="toggleRemLogic('ARR')" class="sr-only"> ARR</label>
+            <label class="flex items-center justify-center py-2 border border-slate-600 rounded-lg bg-slate-700 text-sm font-bold cursor-pointer has-[:checked]:bg-blue-900 has-[:checked]:border-blue-500"><input type="radio" name="movement" value="DEP" onclick="toggleRemLogic('DEP')" class="sr-only"> DEP</label>
+            <label class="flex items-center justify-center py-2 border border-slate-600 rounded-lg bg-slate-700 text-sm font-bold cursor-pointer has-[:checked]:bg-blue-900 has-[:checked]:border-blue-500"><input type="radio" name="movement" value="REM" onclick="toggleRemLogic('REM')" class="sr-only"> REM</label>
           </div>
         </div>
       </div>
 
       <div id="rem-duration-box" class="hidden bg-slate-750 p-2 rounded-lg border border-dashed border-slate-600 space-y-1">
-        <label class="block text-[9px] font-bold uppercase tracking-wider text-slate-400 text-left">Removal Duration</label>
+        <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 text-left">Removal Duration</label>
         <div class="grid grid-cols-3 gap-1">
-          <label class="flex items-center justify-center py-1.5 border border-slate-600 rounded-md bg-slate-700 text-[11px] cursor-pointer has-[:checked]:bg-blue-950 has-[:checked]:border-blue-400"><input type="radio" name="duration" value="<3'" checked class="sr-only"> &lt;3'</label>
-          <label class="flex items-center justify-center py-1.5 border border-slate-600 rounded-md bg-slate-700 text-[11px] cursor-pointer has-[:checked]:bg-blue-950 has-[:checked]:border-blue-400"><input type="radio" name="duration" value="3-10'" class="sr-only"> 3-10'</label>
-          <label class="flex items-center justify-center py-1.5 border border-slate-600 rounded-md bg-slate-700 text-[11px] cursor-pointer has-[:checked]:bg-blue-950 has-[:checked]:border-blue-400"><input type="radio" name="duration" value=">10'" class="sr-only"> &gt;10'</label>
+          <label class="flex items-center justify-center py-1.5 border border-slate-600 rounded-md bg-slate-700 text-xs cursor-pointer has-[:checked]:bg-blue-950 has-[:checked]:border-blue-400"><input type="radio" name="duration" value="<3'" checked class="sr-only"> &lt;3'</label>
+          <label class="flex items-center justify-center py-1.5 border border-slate-600 rounded-md bg-slate-700 text-xs cursor-pointer has-[:checked]:bg-blue-950 has-[:checked]:border-blue-400"><input type="radio" name="duration" value="3-10'" class="sr-only"> 3-10'</label>
+          <label class="flex items-center justify-center py-1.5 border border-slate-600 rounded-md bg-slate-700 text-xs cursor-pointer has-[:checked]:bg-blue-950 has-[:checked]:border-blue-400"><input type="radio" name="duration" value=">10'" class="sr-only"> &gt;10'</label>
         </div>
       </div>
 
       <div>
-        <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Vessel Name</label>
+        <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Vessel Name</label>
         <div class="flex gap-1">
-          <select id="vesselName" onchange="onVesselSelect()" class="flex-1 p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-sm focus:outline-none text-right font-bold"></select>
-          <button type="button" onclick="addNewVesselPrompt()" class="px-3 bg-slate-600 rounded-lg text-sm font-bold">+</button>
-          <button type="button" onclick="deleteActiveVessel()" class="px-3 bg-rose-950 border border-rose-800 rounded-lg text-xs font-bold text-rose-400">×</button>
+          <select id="vesselName" onchange="onVesselSelect()" class="flex-1 p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-base focus:outline-none text-right font-bold"></select>
+          <button type="button" onclick="addNewVesselPrompt()" class="px-3 bg-slate-600 rounded-lg text-base font-bold">+</button>
+          <button type="button" onclick="deleteActiveVessel()" class="px-3 bg-rose-950 border border-rose-800 rounded-lg text-sm font-bold text-rose-400">×</button>
         </div>
       </div>
 
       <div class="grid grid-cols-2 gap-2">
         <div class="flex flex-col">
-          <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">From Station / Berth</label>
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">From Station / Berth</label>
           <div class="flex gap-1 h-10">
-            <select id="fromLoc" class="flex-1 p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-xs focus:outline-none text-right"></select>
-            <button type="button" onclick="addNewListItem('fromLoc', 'Station')" class="px-2.5 bg-slate-600 rounded-lg text-xs font-bold">+</button>
+            <select id="fromLoc" class="flex-1 p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-sm focus:outline-none text-right"></select>
+            <button type="button" onclick="addNewListItem('fromLoc', 'Station')" class="px-2.5 bg-slate-600 rounded-lg text-sm font-bold">+</button>
           </div>
         </div>
         <div class="flex flex-col">
-          <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">TO Station / Berth</label>
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">TO Station / Berth</label>
           <div class="flex gap-1 h-10">
-            <select id="toLoc" class="flex-1 p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-xs focus:outline-none text-right"></select>
-            <button type="button" onclick="addNewListItem('toLoc', 'Station')" class="px-2.5 bg-slate-600 rounded-lg text-xs font-bold">+</button>
+            <select id="toLoc" class="flex-1 p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-sm focus:outline-none text-right"></select>
+            <button type="button" onclick="addNewListItem('toLoc', 'Station')" class="px-2.5 bg-slate-600 rounded-lg text-sm font-bold">+</button>
           </div>
         </div>
       </div>
     </section>
 
     <!-- SECTION 2: VESSEL PARTICULARS -->
-    <section class="bg-slate-800 rounded-xl border border-slate-700 shadow-md overflow-hidden">
-      <button type="button" onclick="toggleDrawerNode('specs-drawer')" class="w-full p-4 flex justify-between items-center text-left focus:outline-none">
-        <h2 class="text-blue-400 font-bold text-xs uppercase tracking-wider">2. Vessel Specifications (Particulars)</h2>
-        <span id="drawer-arrow" class="text-xs text-slate-400 transition-transform">▼ Expand</span>
-      </button>
+    <section id="tab-vessel" class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-md space-y-3">
+      <h2 class="text-blue-400 font-bold text-sm uppercase tracking-wider border-b border-slate-700 pb-1">2. Vessel Specifications (Particulars)</h2>
 
-      <div id="specs-drawer" class="hidden p-4 border-t border-slate-700 bg-slate-800/50 space-y-3">
+      <div id="specs-drawer" class="space-y-3">
         <div class="grid grid-cols-2 gap-2">
           <div>
-            <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Draft Fore (xx.x)</label>
-            <input type="number" step="0.1" inputmode="decimal" id="draftFore" placeholder="0.0" class="w-full p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-sm focus:outline-none text-right">
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Draft Fore (xx.x)</label>
+            <input type="number" step="0.1" inputmode="decimal" id="draftFore" placeholder="0.0" class="w-full p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-base focus:outline-none text-right">
           </div>
           <div>
-            <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Draft Aft (xx.x)</label>
-            <input type="number" step="0.1" inputmode="decimal" id="draftAft" placeholder="0.0" class="w-full p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-sm focus:outline-none text-right">
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Draft Aft (xx.x)</label>
+            <input type="number" step="0.1" inputmode="decimal" id="draftAft" placeholder="0.0" class="w-full p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-base focus:outline-none text-right">
           </div>
         </div>
 
         <div class="grid grid-cols-2 gap-2">
           <div>
-            <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">IMO (7 Digits)</label>
-            <input type="text" inputmode="numeric" pattern="[0-9]{7}" maxlength="7" id="imoNumber" placeholder="1234567" class="w-full p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-sm focus:outline-none text-right">
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">IMO (7 Digits)</label>
+            <input type="text" inputmode="numeric" pattern="[0-9]{7}" maxlength="7" id="imoNumber" placeholder="1234567" class="w-full p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-base focus:outline-none text-right">
           </div>
           <div>
-            <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Gross Tonnage</label>
-            <input type="number" min="0" inputmode="numeric" pattern="[0-9]*" id="grossTonnage" placeholder="Tons" class="w-full p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-sm focus:outline-none text-right">
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Gross Tonnage</label>
+            <input type="number" min="0" inputmode="numeric" pattern="[0-9]*" id="grossTonnage" placeholder="Tons" class="w-full p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-base focus:outline-none text-right">
           </div>
         </div>
 
         <div class="grid grid-cols-2 gap-2">
           <div>
-            <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Flag</label>
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Flag</label>
             <div class="flex gap-1">
-              <select id="flag" class="flex-1 p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-xs focus:outline-none text-right"></select>
-              <button type="button" onclick="addNewListItem('flag', 'Flag')" class="px-2 bg-slate-600 rounded-lg text-xs font-bold">+</button>
+              <select id="flag" class="flex-1 p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-sm focus:outline-none text-right"></select>
+              <button type="button" onclick="addNewListItem('flag', 'Flag')" class="px-2 bg-slate-600 rounded-lg text-sm font-bold">+</button>
             </div>
           </div>
           <div>
-            <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Call Sign</label>
-            <input type="text" id="callSign" class="w-full p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-sm focus:outline-none text-right">
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Call Sign</label>
+            <input type="text" id="callSign" class="w-full p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-base focus:outline-none text-right">
           </div>
         </div>
 
         <div class="grid grid-cols-2 gap-2">
           <div>
-            <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Deadweight (DWT)</label>
-            <input type="number" min="0" inputmode="numeric" pattern="[0-9]*" id="dwt" placeholder="DWT" class="w-full p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-sm focus:outline-none text-right">
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Deadweight (DWT)</label>
+            <input type="number" min="0" inputmode="numeric" pattern="[0-9]*" id="dwt" placeholder="DWT" class="w-full p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-base focus:outline-none text-right">
           </div>
           <div>
-            <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">I.T. Cert (69)</label>
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">I.T. Cert (69)</label>
             <div class="grid grid-cols-2 gap-1">
-              <label class="flex items-center justify-center py-2 border border-slate-600 rounded-lg bg-slate-700 text-xs font-bold cursor-pointer has-[:checked]:bg-blue-900 has-[:checked]:border-blue-500"><input type="radio" name="itCert" value="Yes" checked class="sr-only"> YES</label>
-              <label class="flex items-center justify-center py-2 border border-slate-600 rounded-lg bg-slate-700 text-xs font-bold cursor-pointer has-[:checked]:bg-blue-900 has-[:checked]:border-blue-500"><input type="radio" name="itCert" value="No" class="sr-only"> NO</label>
+              <label class="flex items-center justify-center py-2 border border-slate-600 rounded-lg bg-slate-700 text-sm font-bold cursor-pointer has-[:checked]:bg-blue-900 has-[:checked]:border-blue-500"><input type="radio" name="itCert" value="Yes" checked class="sr-only"> YES</label>
+              <label class="flex items-center justify-center py-2 border border-slate-600 rounded-lg bg-slate-700 text-sm font-bold cursor-pointer has-[:checked]:bg-blue-900 has-[:checked]:border-blue-500"><input type="radio" name="itCert" value="No" class="sr-only"> NO</label>
             </div>
           </div>
         </div>
 
         <div class="grid grid-cols-3 gap-1">
           <div>
-            <label class="block text-[9px] font-bold uppercase tracking-wider text-slate-400 text-left">LOA (m)</label>
-            <input type="number" step="0.1" inputmode="decimal" id="loa" placeholder="Length" class="w-full p-1.5 rounded bg-slate-700 border border-slate-600 text-xs text-white focus:outline-none text-right">
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 text-left">LOA (m)</label>
+            <input type="number" step="0.1" inputmode="decimal" id="loa" placeholder="Length" class="w-full p-1.5 rounded bg-slate-700 border border-slate-600 text-sm text-white focus:outline-none text-right">
           </div>
           <div>
-            <label class="block text-[9px] font-bold uppercase tracking-wider text-slate-400 text-left">Breadth (m)</label>
-            <input type="number" step="0.1" inputmode="decimal" id="beam" placeholder="Beam" class="w-full p-1.5 rounded bg-slate-700 border border-slate-600 text-xs text-white focus:outline-none text-right">
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 text-left">Breadth (m)</label>
+            <input type="number" step="0.1" inputmode="decimal" id="beam" placeholder="Beam" class="w-full p-1.5 rounded bg-slate-700 border border-slate-600 text-sm text-white focus:outline-none text-right">
           </div>
           <div>
-            <label class="block text-[9px] font-bold uppercase tracking-wider text-slate-400 text-left">Build (YYYY)</label>
-            <input type="number" inputmode="numeric" pattern="[0-9]*" id="buildDate" placeholder="Year" class="w-full p-1.5 rounded bg-slate-700 border border-slate-600 text-xs text-white focus:outline-none text-right">
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 text-left">Build (YYYY)</label>
+            <input type="number" inputmode="numeric" pattern="[0-9]*" id="buildDate" placeholder="Year" class="w-full p-1.5 rounded bg-slate-700 border border-slate-600 text-sm text-white focus:outline-none text-right">
           </div>
         </div>
 
         <div class="grid grid-cols-2 gap-2">
           <div>
-            <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Props Configuration</label>
-            <div class="grid grid-cols-3 gap-1 text-[10px]">
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Props Configuration</label>
+            <div class="grid grid-cols-3 gap-1 text-xs">
               <label class="flex items-center justify-center py-1.5 border border-slate-600 rounded-md bg-slate-700 font-bold cursor-pointer has-[:checked]:bg-blue-900 has-[:checked]:border-blue-500"><input type="radio" name="props" value="Single" checked class="sr-only"> Single</label>
               <label class="flex items-center justify-center py-1.5 border border-slate-600 rounded-md bg-slate-700 font-bold cursor-pointer has-[:checked]:bg-blue-900 has-[:checked]:border-blue-500"><input type="radio" name="props" value="Twin" class="sr-only"> Twin</label>
               <label class="flex items-center justify-center py-1.5 border border-slate-600 rounded-md bg-slate-700 font-bold cursor-pointer has-[:checked]:bg-blue-900 has-[:checked]:border-blue-500"><input type="radio" name="props" value="Multi" class="sr-only"> Multi</label>
             </div>
           </div>
           <div>
-            <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Pitch</label>
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Pitch</label>
             <div class="grid grid-cols-2 gap-1">
-              <label class="flex items-center justify-center py-1.5 border border-slate-600 rounded-md bg-slate-700 text-[10px] font-bold cursor-pointer has-[:checked]:bg-blue-900 has-[:checked]:border-blue-500"><input type="radio" name="pitch" value="Fixed" checked class="sr-only"> Fixed</label>
-              <label class="flex items-center justify-center py-1.5 border border-slate-600 rounded-md bg-slate-700 text-[10px] font-bold cursor-pointer has-[:checked]:bg-blue-900 has-[:checked]:border-blue-500"><input type="radio" name="pitch" value="Controllable" class="sr-only"> C/P</label>
+              <label class="flex items-center justify-center py-1.5 border border-slate-600 rounded-md bg-slate-700 text-xs font-bold cursor-pointer has-[:checked]:bg-blue-900 has-[:checked]:border-blue-500"><input type="radio" name="pitch" value="Fixed" checked class="sr-only"> Fixed</label>
+              <label class="flex items-center justify-center py-1.5 border border-slate-600 rounded-md bg-slate-700 text-xs font-bold cursor-pointer has-[:checked]:bg-blue-900 has-[:checked]:border-blue-500"><input type="radio" name="pitch" value="Controllable" class="sr-only"> C/P</label>
             </div>
           </div>
         </div>
 
         <div class="grid grid-cols-2 gap-2">
           <div>
-            <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Propulsion Type</label>
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Propulsion Type</label>
             <div class="flex gap-1">
-              <select id="propulsion" class="flex-1 p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-xs focus:outline-none text-right"></select>
-              <button type="button" onclick="addNewListItem('propulsion', 'Type')" class="px-2 bg-slate-600 rounded-lg text-xs font-bold">+</button>
+              <select id="propulsion" class="flex-1 p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-sm focus:outline-none text-right"></select>
+              <button type="button" onclick="addNewListItem('propulsion', 'Type')" class="px-2 bg-slate-600 rounded-lg text-sm font-bold">+</button>
             </div>
           </div>
           <div>
-            <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Service Speed (kts)</label>
-            <input type="number" step="0.1" inputmode="decimal" id="speed" placeholder="XX" class="w-full p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-sm focus:outline-none text-right">
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Service Speed (kts)</label>
+            <input type="number" step="0.1" inputmode="decimal" id="speed" placeholder="XX" class="w-full p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-base focus:outline-none text-right">
           </div>
         </div>
 
         <div>
-          <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Thrust Configuration</label>
-          <div class="grid grid-cols-4 gap-1 text-[9px] font-bold">
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Thrust Configuration</label>
+          <div class="grid grid-cols-4 gap-1 text-xs font-bold">
             <label class="flex items-center justify-center py-1.5 border border-slate-600 rounded-md bg-slate-700 cursor-pointer has-[:checked]:bg-blue-900 has-[:checked]:border-blue-500"><input type="radio" name="thrust" value="None" checked onclick="evaluateThrustLogic()" class="sr-only"> None</label>
             <label class="flex items-center justify-center py-1.5 border border-slate-600 rounded-md bg-slate-700 cursor-pointer has-[:checked]:bg-blue-900 has-[:checked]:border-blue-500"><input type="radio" name="thrust" value="Bow" onclick="evaluateThrustLogic()" class="sr-only"> Bow</label>
             <label class="flex items-center justify-center py-1.5 border border-slate-600 rounded-md bg-slate-700 cursor-pointer"><input type="radio" name="thrust" value="Stern" onclick="evaluateThrustLogic()" class="sr-only"> Stern</label>
@@ -267,16 +328,16 @@
 
         <div class="grid grid-cols-2 gap-2">
           <div>
-            <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Thrust Power Source</label>
-            <div class="grid grid-cols-3 gap-1 text-[10px] font-bold">
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Thrust Power Source</label>
+            <div class="grid grid-cols-3 gap-1 text-xs font-bold">
               <label id="lbl-tPower-Motor" class="flex items-center justify-center py-1.5 border border-slate-600 rounded-md bg-slate-700 cursor-pointer has-[:checked]:bg-blue-900 has-[:checked]:border-blue-500"><input type="radio" name="tPower" value="Motor" class="sr-only"> Motor</label>
               <label id="lbl-tPower-Electric" class="flex items-center justify-center py-1.5 border border-slate-600 rounded-md bg-slate-700 cursor-pointer has-[:checked]:bg-blue-900 has-[:checked]:border-blue-500"><input type="radio" name="tPower" value="Electric" class="sr-only"> Electric</label>
               <label id="lbl-tPower-NA" class="flex items-center justify-center py-1.5 border border-slate-600 rounded-md bg-slate-700 cursor-pointer has-[:checked]:bg-blue-900 has-[:checked]:border-blue-500"><input type="radio" name="tPower" value="N/A" checked class="sr-only"> N/A</label>
             </div>
           </div>
           <div>
-            <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Helo Operations</label>
-            <select id="helo" class="w-full p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-xs focus:outline-hidden text-right">
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Helo Operations</label>
+            <select id="helo" class="w-full p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-sm focus:outline-hidden text-right">
               <option value="Yes">Yes</option>
               <option value="No">No</option>
               <option value=">18m">&gt;18m</option>
@@ -286,24 +347,24 @@
         </div>
 
         <div class="grid grid-cols-2 gap-2 pt-1">
-          <div class="flex items-center justify-between p-2 rounded-lg bg-slate-750 border border-slate-700 text-xs">
-            <select id="rudders" class="p-1 rounded bg-slate-600 text-white text-[11px] text-right">
+          <div class="flex items-center justify-between p-2 rounded-lg bg-slate-750 border border-slate-700 text-sm">
+            <select id="rudders" class="p-1 rounded bg-slate-600 text-white text-xs text-right">
               <option value="Single">Single</option>
               <option value="Twin">Twin</option>
               <option value="Special">Special</option>
             </select>
             <label class="font-bold uppercase text-slate-400 ml-2 text-left">Rudders</label>
           </div>
-          <div class="flex items-center justify-between p-2 rounded-lg bg-slate-750 border border-slate-700 text-xs">
+          <div class="flex items-center justify-between p-2 rounded-lg bg-slate-750 border border-slate-700 text-sm">
             <div class="grid grid-cols-2 gap-0.5">
-              <label class="px-2 py-0.5 border border-slate-600 bg-slate-700 text-[10px] rounded-sm text-center has-[:checked]:bg-blue-900"><input type="radio" name="bulbBow" value="Yes" checked class="sr-only"> Y</label>
-              <label class="px-2 py-0.5 border border-slate-600 bg-slate-700 text-[10px] rounded-sm text-center has-[:checked]:bg-blue-900"><input type="radio" name="bulbBow" value="No" class="sr-only"> N</label>
+              <label class="px-2 py-0.5 border border-slate-600 bg-slate-700 text-xs rounded-sm text-center has-[:checked]:bg-blue-900"><input type="radio" name="bulbBow" value="Yes" checked class="sr-only"> Y</label>
+              <label class="px-2 py-0.5 border border-slate-600 bg-slate-700 text-xs rounded-sm text-center has-[:checked]:bg-blue-900"><input type="radio" name="bulbBow" value="No" class="sr-only"> N</label>
             </div>
             <label class="font-bold uppercase text-slate-400 ml-2 text-left">Bulb Bow</label>
           </div>
         </div>
 
-        <div class="grid grid-cols-3 gap-1 text-[9px] font-bold bg-slate-750 p-2 rounded-lg border border-slate-700">
+        <div class="grid grid-cols-3 gap-1 text-xs font-bold bg-slate-750 p-2 rounded-lg border border-slate-700">
           <div>
             <label class="block text-slate-400 uppercase mb-0.5 text-left">Double Hull</label>
             <div class="grid grid-cols-2 gap-0.5">
@@ -329,20 +390,20 @@
 
         <div class="bg-slate-750 p-2.5 rounded-lg border border-slate-700 space-y-2 text-left">
           <div class="flex justify-between items-center">
-            <label class="flex items-center gap-1.5 text-xs text-amber-400 font-bold cursor-pointer">
+            <label class="flex items-center gap-1.5 text-sm text-amber-400 font-bold cursor-pointer">
               <input type="checkbox" id="ballastNA" onchange="toggleBallastNAFieldRules(this.checked)" class="rounded bg-slate-700 border-slate-600 checked:bg-blue-600"> Ballast Not Applicable (N/A)
             </label>
-            <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Ballast Entry</span>
+            <span class="text-xs text-slate-400 font-bold uppercase tracking-wider">Ballast Entry</span>
           </div>
           
           <div class="grid grid-cols-2 gap-2">
             <div id="wrapper-ballastTons">
-              <label class="block text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-0.5 text-left">Discharge (Tons)</label>
-              <input type="number" min="0" inputmode="numeric" pattern="[0-9]*" id="ballastTons" placeholder="Tons" class="w-full p-1.5 rounded bg-slate-700 border border-slate-600 text-xs text-white text-right focus:outline-none">
+              <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-0.5 text-left">Discharge (Tons)</label>
+              <input type="number" min="0" inputmode="numeric" pattern="[0-9]*" id="ballastTons" placeholder="Tons" class="w-full p-1.5 rounded bg-slate-700 border border-slate-600 text-sm text-white text-right focus:outline-none">
             </div>
             <div id="wrapper-ballastPlace">
-              <label class="block text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-0.5 text-left">Ballast Position</label>
-              <div class="grid grid-cols-4 gap-0.5 text-[9px] font-black">
+              <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-0.5 text-left">Ballast Position</label>
+              <div class="grid grid-cols-4 gap-0.5 text-xs font-black">
                 <label class="flex items-center justify-center py-1 border border-slate-600 rounded-sm bg-slate-700 cursor-pointer has-[:checked]:bg-blue-900"><input type="radio" name="ballastPlace" value="At Roads" checked class="sr-only"> Rds</label>
                 <label class="flex items-center justify-center py-1 border border-slate-600 rounded-sm bg-slate-700 cursor-pointer has-[:checked]:bg-blue-900"><input type="radio" name="ballastPlace" value="At Anchor" class="sr-only"> Anc</label>
                 <label class="flex items-center justify-center py-1 border border-slate-600 rounded-sm bg-slate-700 cursor-pointer has-[:checked]:bg-blue-900"><input type="radio" name="ballastPlace" value="Enroute" class="sr-only"> Enr</label>
@@ -355,45 +416,45 @@
     </section>
 
     <!-- SECTION 3: TIMINGS AND TRANSIT DETAILS -->
-    <section class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-md space-y-4">
-      <h2 class="text-blue-400 font-bold text-xs uppercase tracking-wider border-b border-slate-700 pb-1 text-left">3. Timings & Transit Logs</h2>
+    <section id="tab-timings" class="hidden bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-md space-y-4">
+      <h2 class="text-blue-400 font-bold text-sm uppercase tracking-wider border-b border-slate-700 pb-1 text-left">3. Timings & Transit Logs</h2>
       
       <div class="bg-slate-750 p-3 rounded-lg border border-slate-700 space-y-3">
-        <div class="border-b border-slate-700/50 pb-1 text-[10px] font-black uppercase text-slate-400 tracking-wider">Station Timestamps</div>
+        <div class="border-b border-slate-700/50 pb-1 text-xs font-black uppercase text-slate-400 tracking-wider">Station Timestamps</div>
         
         <div class="space-y-2">
           <div>
-            <label class="block text-[10px] font-bold text-slate-400 mb-0.5">Depart Station</label>
+            <label class="block text-xs font-bold text-slate-400 mb-0.5">Depart Station</label>
             <div class="flex gap-1">
-              <input type="text" id="day_timeDepStation" class="w-12 p-2 rounded-md bg-slate-700 border border-slate-600 text-center text-xs font-bold text-blue-300" placeholder="DD">
-              <input type="time" id="clock_timeDepStation" onchange="mergePickerFields('timeDepStation')" class="flex-1 p-2 rounded-md bg-slate-700 border border-slate-600 text-xs text-white focus:outline-none text-right">
+              <input type="text" id="day_timeDepStation" class="w-12 p-2 rounded-md bg-slate-700 border border-slate-600 text-center text-sm font-bold text-blue-300" placeholder="DD">
+              <input type="time" id="clock_timeDepStation" onchange="mergePickerFields('timeDepStation')" class="flex-1 p-2 rounded-md bg-slate-700 border border-slate-600 text-sm text-white focus:outline-none text-right">
             </div>
             <input type="hidden" id="timeDepStation">
           </div>
 
           <div>
-            <label class="block text-[10px] font-bold text-slate-400 mb-0.5">Pilot on Board</label>
+            <label class="block text-xs font-bold text-slate-400 mb-0.5">Pilot on Board</label>
             <div class="flex gap-1">
-              <input type="text" id="day_timePilotOnBoard" class="w-12 p-2 rounded-md bg-slate-700 border border-slate-600 text-center text-xs font-bold text-blue-300" placeholder="DD">
-              <input type="time" id="clock_timePilotOnBoard" onchange="mergePickerFields('timePilotOnBoard')" class="flex-1 p-2 rounded-md bg-slate-700 border border-slate-600 text-xs text-white focus:outline-none text-right">
+              <input type="text" id="day_timePilotOnBoard" class="w-12 p-2 rounded-md bg-slate-700 border border-slate-600 text-center text-sm font-bold text-blue-300" placeholder="DD">
+              <input type="time" id="clock_timePilotOnBoard" onchange="mergePickerFields('timePilotOnBoard')" class="flex-1 p-2 rounded-md bg-slate-700 border border-slate-600 text-sm text-white focus:outline-none text-right">
             </div>
             <input type="hidden" id="timePilotOnBoard">
           </div>
 
           <div>
-            <label class="block text-[10px] font-bold text-slate-400 mb-0.5">Disembark</label>
+            <label class="block text-xs font-bold text-slate-400 mb-0.5">Disembark</label>
             <div class="flex gap-1">
-              <input type="text" id="day_timeDisembark" class="w-12 p-2 rounded-md bg-slate-700 border border-slate-600 text-center text-xs font-bold text-blue-300" placeholder="DD">
-              <input type="time" id="clock_timeDisembark" onchange="mergePickerFields('timeDisembark')" class="flex-1 p-2 rounded-md bg-slate-700 border border-slate-600 text-xs text-white focus:outline-none text-right">
+              <input type="text" id="day_timeDisembark" class="w-12 p-2 rounded-md bg-slate-700 border border-slate-600 text-center text-sm font-bold text-blue-300" placeholder="DD">
+              <input type="time" id="clock_timeDisembark" onchange="mergePickerFields('timeDisembark')" class="flex-1 p-2 rounded-md bg-slate-700 border border-slate-600 text-sm text-white focus:outline-none text-right">
             </div>
             <input type="hidden" id="timeDisembark">
           </div>
 
           <div>
-            <label class="block text-[10px] font-bold text-slate-400 mb-0.5">Arrive Station</label>
+            <label class="block text-xs font-bold text-slate-400 mb-0.5">Arrive Station</label>
             <div class="flex gap-1">
-              <input type="text" id="day_timeArrStation" class="w-12 p-2 rounded-md bg-slate-700 border border-slate-600 text-center text-xs font-bold text-blue-300" placeholder="DD">
-              <input type="time" id="clock_timeArrStation" onchange="mergePickerFields('timeArrStation')" class="flex-1 p-2 rounded-md bg-slate-700 border border-slate-600 text-xs text-white focus:outline-none text-right">
+              <input type="text" id="day_timeArrStation" class="w-12 p-2 rounded-md bg-slate-700 border border-slate-600 text-center text-sm font-bold text-blue-300" placeholder="DD">
+              <input type="time" id="clock_timeArrStation" onchange="mergePickerFields('timeArrStation')" class="flex-1 p-2 rounded-md bg-slate-700 border border-slate-600 text-sm text-white focus:outline-none text-right">
             </div>
             <input type="hidden" id="timeArrStation">
           </div>
@@ -401,8 +462,8 @@
       </div>
 
       <div>
-        <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Transfer By</label>
-        <div class="grid grid-cols-4 gap-1 text-[10px] font-bold">
+        <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Transfer By</label>
+        <div class="grid grid-cols-4 gap-1 text-xs font-bold">
           <label class="flex items-center justify-center py-2 border border-slate-600 rounded-md bg-slate-700 cursor-pointer has-[:checked]:bg-blue-900"><input type="radio" name="transferBy" value="Helo" checked class="sr-only"> Helo</label>
           <label class="flex items-center justify-center py-2 border border-slate-600 rounded-md bg-slate-700 cursor-pointer has-[:checked]:bg-blue-900"><input type="radio" name="transferBy" value="Pilot Boat" class="sr-only"> P/Boat</label>
           <label class="flex items-center justify-center py-2 border border-slate-600 rounded-md bg-slate-700 cursor-pointer has-[:checked]:bg-blue-900"><input type="radio" name="transferBy" value="Car" class="sr-only"> Car</label>
@@ -411,21 +472,21 @@
       </div>
 
       <div class="bg-slate-750 p-3 rounded-lg border border-slate-700 space-y-2">
-        <div class="text-[10px] font-black uppercase text-slate-400 tracking-wider">Outport Logistics HQ Logs</div>
+        <div class="text-xs font-black uppercase text-slate-400 tracking-wider">Outport Logistics HQ Logs</div>
         <div class="grid grid-cols-2 gap-2">
           <div>
-            <label class="block text-[9px] font-bold text-slate-400 mb-0.5">Outport Depart</label>
+            <label class="block text-xs font-bold text-slate-400 mb-0.5">Outport Depart</label>
             <div class="flex gap-0.5">
-              <input type="text" id="day_timeOutportDep" class="w-8 p-1.5 rounded-l-md bg-slate-700 border border-slate-600 text-center text-xs font-bold text-blue-300" placeholder="DD">
-              <input type="time" id="clock_timeOutportDep" onchange="mergePickerFields('timeOutportDep')" class="flex-1 p-1.5 rounded-r-md bg-slate-700 border border-slate-600 text-xs text-white focus:outline-none text-right">
+              <input type="text" id="day_timeOutportDep" class="w-8 p-1.5 rounded-l-md bg-slate-700 border border-slate-600 text-center text-sm font-bold text-blue-300" placeholder="DD">
+              <input type="time" id="clock_timeOutportDep" onchange="mergePickerFields('timeOutportDep')" class="flex-1 p-1.5 rounded-r-md bg-slate-700 border border-slate-600 text-sm text-white focus:outline-none text-right">
             </div>
             <input type="hidden" id="timeOutportDep">
           </div>
           <div>
-            <label class="block text-[9px] font-bold text-slate-400 mb-0.5">Outport Arrive</label>
+            <label class="block text-xs font-bold text-slate-400 mb-0.5">Outport Arrive</label>
             <div class="flex gap-0.5">
-              <input type="text" id="day_timeOutportArr" class="w-8 p-1.5 rounded-l-md bg-slate-700 border border-slate-600 text-center text-xs font-bold text-blue-300" placeholder="DD">
-              <input type="time" id="clock_timeOutportArr" onchange="mergePickerFields('timeOutportArr')" class="flex-1 p-1.5 rounded-r-md bg-slate-700 border border-slate-600 text-xs text-white focus:outline-none text-right">
+              <input type="text" id="day_timeOutportArr" class="w-8 p-1.5 rounded-l-md bg-slate-700 border border-slate-600 text-center text-sm font-bold text-blue-300" placeholder="DD">
+              <input type="time" id="clock_timeOutportArr" onchange="mergePickerFields('timeOutportArr')" class="flex-1 p-1.5 rounded-r-md bg-slate-700 border border-slate-600 text-sm text-white focus:outline-none text-right">
             </div>
             <input type="hidden" id="timeOutportArr">
           </div>
@@ -435,76 +496,92 @@
       <!-- TEXT FIELD LOGS FOR DURATION ENTRIES -->
       <div class="grid grid-cols-3 gap-1">
         <div>
-          <label class="block text-[9px] font-bold uppercase tracking-wider text-slate-400 text-left">Delays (H:MM)</label>
-          <input type="text" inputmode="numeric" pattern="[0-9]*" id="delays" placeholder="0:00" oninput="applyDurationMask(this)" class="w-full p-2 rounded-md bg-slate-700 border border-slate-600 text-xs text-white focus:outline-none text-right font-mono tracking-wide">
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 text-left">Delays (H:MM)</label>
+          <input type="text" inputmode="numeric" pattern="[0-9]*" id="delays" placeholder="0:00" oninput="applyDurationMask(this)" class="w-full p-2 rounded-md bg-slate-700 border border-slate-600 text-sm text-white focus:outline-none text-right font-mono tracking-wide">
         </div>
         <div>
-          <label class="block text-[9px] font-bold uppercase tracking-wider text-slate-400 text-left">Standby (H:MM)</label>
-          <input type="text" inputmode="numeric" pattern="[0-9]*" id="standby" placeholder="0:00" oninput="applyDurationMask(this)" class="w-full p-2 rounded-md bg-slate-700 border border-slate-600 text-xs text-white focus:outline-none text-right font-mono tracking-wide">
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 text-left">Standby (H:MM)</label>
+          <input type="text" inputmode="numeric" pattern="[0-9]*" id="standby" placeholder="0:00" oninput="applyDurationMask(this)" class="w-full p-2 rounded-md bg-slate-700 border border-slate-600 text-sm text-white focus:outline-none text-right font-mono tracking-wide">
         </div>
         <div>
-          <label class="block text-[9px] font-bold uppercase tracking-wider text-slate-400 text-left">Cancellation</label>
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 text-left">Cancellation</label>
           <div class="flex gap-0.5">
-            <input type="text" id="day_cancellation" class="w-8 p-2 rounded-l-md bg-slate-700 border border-slate-600 text-center text-xs font-bold text-blue-300" placeholder="DD">
-            <input type="time" id="clock_cancellation" onchange="mergePickerFields('cancellation')" class="flex-1 p-2 rounded-r-md bg-slate-700 border border-slate-600 text-xs text-white focus:outline-none text-right">
+            <input type="text" id="day_cancellation" class="w-8 p-2 rounded-l-md bg-slate-700 border border-slate-600 text-center text-sm font-bold text-blue-300" placeholder="DD">
+            <input type="time" id="clock_cancellation" onchange="mergePickerFields('cancellation')" class="flex-1 p-2 rounded-r-md bg-slate-700 border border-slate-600 text-sm text-white focus:outline-none text-right">
           </div>
           <input type="hidden" id="cancellation">
         </div>
       </div>
 
       <div>
-        <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Comments</label>
-        <textarea id="comments" rows="2" placeholder="Enter special circumstances here..." class="w-full p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-xs focus:outline-none text-right"></textarea>
+        <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Comments</label>
+        <textarea id="comments" rows="2" placeholder="Enter special circumstances here..." class="w-full p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-sm focus:outline-none text-right"></textarea>
       </div>
     </section>
 
     <!-- SECTION 4: ATTESTATION AND SIGNATURES -->
-    <section class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-md space-y-4 text-right">
-      <h2 class="text-blue-400 font-bold text-xs uppercase tracking-wider border-b border-slate-700 pb-1 text-left">4. Verification & Attestation</h2>
+    <section id="tab-attestation" class="hidden bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-md space-y-4 text-right">
+      <h2 class="text-blue-400 font-bold text-sm uppercase tracking-wider border-b border-slate-700 pb-1 text-left">4. Verification & Attestation</h2>
       
       <div>
-        <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Master's Name (Print Entry Above Signature)</label>
-        <input type="text" id="masterName" placeholder="e.g. Captain J. Smith" class="w-full p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-sm focus:outline-none text-right">
+        <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Master's Name (Print Entry Above Signature)</label>
+        <input type="text" id="masterName" placeholder="e.g. Captain J. Smith" class="w-full p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-base focus:outline-none text-right">
       </div>
 
       <div class="space-y-4 pt-2">
         <div>
           <div class="flex justify-between items-center mb-1">
-            <button type="button" onclick="masterPad.clear()" class="text-xs text-rose-400 font-medium">Clear</button>
-            <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 text-left">Signature of Master</span>
+            <button type="button" onclick="masterPad.clear()" class="text-sm text-rose-400 font-medium">Clear</button>
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-400 text-left">Signature of Master</span>
           </div>
           <div class="relative">
             <canvas id="master-signature" class="w-full h-24 border border-slate-600 rounded-lg bg-slate-50"></canvas>
-            <button type="button" id="master-signature-lock-btn" onclick="toggleSignatureLock('master-signature')" class="absolute top-1.5 right-1.5 text-[10px] font-bold px-2 py-1 rounded-full bg-slate-800/80 text-slate-200 border border-slate-500">🔒 Tap to Sign</button>
+            <button type="button" id="master-signature-lock-btn" onclick="toggleSignatureLock('master-signature')" class="absolute top-1.5 right-1.5 text-xs font-bold px-2 py-1 rounded-full bg-slate-800/80 text-slate-200 border border-slate-500">🔒 Tap to Sign</button>
           </div>
         </div>
 
         <div>
           <div class="flex justify-between items-center mb-1">
-            <button type="button" onclick="pilotPad.clear()" class="text-xs text-rose-400 font-medium">Clear</button>
-            <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400 text-left">
+            <button type="button" onclick="pilotPad.clear()" class="text-sm text-rose-400 font-medium">Clear</button>
+            <div class="text-xs font-bold uppercase tracking-wider text-slate-400 text-left">
               Signature of Pilot: <span id="pilot-signature-label" class="text-blue-400 ml-1">BARCHETTI</span>
             </div>
           </div>
           <div class="relative">
             <canvas id="pilot-signature" class="w-full h-24 border border-slate-600 rounded-lg bg-slate-50"></canvas>
-            <button type="button" id="pilot-signature-lock-btn" onclick="toggleSignatureLock('pilot-signature')" class="absolute top-1.5 right-1.5 text-[10px] font-bold px-2 py-1 rounded-full bg-slate-800/80 text-slate-200 border border-slate-500">🔒 Tap to Sign</button>
+            <button type="button" id="pilot-signature-lock-btn" onclick="toggleSignatureLock('pilot-signature')" class="absolute top-1.5 right-1.5 text-xs font-bold px-2 py-1 rounded-full bg-slate-800/80 text-slate-200 border border-slate-500">🔒 Tap to Sign</button>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- BUTTON RUN BLOCK -->
-    <section class="grid grid-cols-2 gap-3 pt-2">
-      <button type="button" onclick="compileCertificatePDF(false)" class="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-xl font-bold text-xs uppercase tracking-wider shadow-md cursor-pointer transition-all">
+    <!-- BUTTON RUN BLOCK: fixed above the tab bar, reachable from every tab -->
+    <section id="run-block" class="grid grid-cols-2 gap-3 bg-slate-900">
+      <button type="button" onclick="compileCertificatePDF(false)" class="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-xl font-bold text-sm uppercase tracking-wider shadow-md cursor-pointer transition-all">
         📥 Save Certificate (Local)
       </button>
-      <button type="button" onclick="compileCertificatePDF(true)" class="w-full bg-slate-700 hover:bg-slate-600 text-white py-3 rounded-xl font-bold text-xs uppercase tracking-wider shadow-md cursor-pointer transition-all">
+      <button type="button" onclick="compileCertificatePDF(true)" class="w-full bg-slate-700 hover:bg-slate-600 text-white py-3 rounded-xl font-bold text-sm uppercase tracking-wider shadow-md cursor-pointer transition-all">
         📤 Share / Send Certificate
       </button>
     </section>
 
   </main>
+
+  <!-- Bottom tab bar: switches which of the 4 sections above is visible -->
+  <nav id="bottom-tabs" class="bg-slate-800">
+    <button type="button" class="tab-btn" data-tab="voyage" onclick="switchTab('voyage')">
+      <span class="tab-icon">🧭</span><span class="tab-label">Voyage</span>
+    </button>
+    <button type="button" class="tab-btn" data-tab="vessel" onclick="switchTab('vessel')">
+      <span class="tab-icon">🚢</span><span class="tab-label">Vessel</span>
+    </button>
+    <button type="button" class="tab-btn" data-tab="timings" onclick="switchTab('timings')">
+      <span class="tab-icon">⏱️</span><span class="tab-label">Timings</span>
+    </button>
+    <button type="button" class="tab-btn" data-tab="attestation" onclick="switchTab('attestation')">
+      <span class="tab-icon">✍️</span><span class="tab-label">Attestation</span>
+    </button>
+  </nav>
 
   <script>
     const defaults = {
@@ -619,6 +696,67 @@
 
     function showAppPrompt(message, title = '', placeholder = '') {
       return showAppModal({ title, message, hasInput: true, placeholder, confirmLabel: 'OK', cancelLabel: 'Cancel' });
+    }
+
+    // ---- Light/dark theme toggle ----
+    const THEME_KEY = 'pnorth_v21_theme';
+
+    function applyTheme(theme) {
+      document.documentElement.setAttribute('data-theme', theme);
+      const btn = document.getElementById('theme-toggle');
+      if (btn) btn.textContent = theme === 'light' ? '🌙' : '☀️';
+    }
+
+    async function toggleTheme() {
+      const current = document.documentElement.getAttribute('data-theme') || 'light';
+      const next = current === 'light' ? 'dark' : 'light';
+      applyTheme(next);
+      try { await localforage.setItem(THEME_KEY, next); } catch (e) {}
+    }
+
+    async function initTheme() {
+      let saved = null;
+      try { saved = await localforage.getItem(THEME_KEY); } catch (e) {}
+      applyTheme(saved === 'dark' ? 'dark' : 'light');
+    }
+
+    // ---- Bottom tab bar: shows one of the 4 sections at a time. Sections
+    // stay in the DOM at all times (only a `hidden` class toggles), so every
+    // form field remains readable/writable by the rest of the app's JS
+    // regardless of which tab is currently visible. ----
+    const TAB_IDS = ['voyage', 'vessel', 'timings', 'attestation'];
+
+    function switchTab(tabId) {
+      TAB_IDS.forEach(id => {
+        const section = document.getElementById('tab-' + id);
+        const btn = document.querySelector('.tab-btn[data-tab="' + id + '"]');
+        if (!section) return;
+        const isActive = id === tabId;
+        section.classList.toggle('hidden', !isActive);
+        if (btn) btn.classList.toggle('active', isActive);
+      });
+      if (tabId === 'attestation') {
+        // The Attestation tab starts hidden, so signature_pad's canvases are
+        // 0x0 at page load (initCanvasDevice ran while `display:none` was in
+        // effect). Resize them the moment this tab actually becomes visible,
+        // preserving any strokes already drawn.
+        requestAnimationFrame(() => {
+          resizeSignatureCanvasKeepingStrokes('master-signature', () => masterPad);
+          resizeSignatureCanvasKeepingStrokes('pilot-signature', () => pilotPad);
+        });
+      }
+    }
+
+    function resizeSignatureCanvasKeepingStrokes(canvasId, getPad) {
+      const canvas = document.getElementById(canvasId);
+      const pad = getPad();
+      if (!canvas || !pad) return;
+      const data = pad.toData();
+      const r = Math.max(window.devicePixelRatio || 1, 1);
+      canvas.width = canvas.offsetWidth * r;
+      canvas.height = canvas.offsetHeight * r;
+      canvas.getContext('2d').scale(r, r);
+      if (data && data.length) pad.fromData(data);
     }
 
     const PIN_HASH_KEY = 'pnorth_v21_pin_hash';
@@ -750,6 +888,8 @@
     }
 
     window.addEventListener('DOMContentLoaded', async () => {
+      initTheme();
+      switchTab('voyage');
       initLockScreen();
       ['lock-pin-input', 'lock-pin-confirm'].forEach(id => {
         document.getElementById(id).addEventListener('keydown', e => {
@@ -875,11 +1015,14 @@
     function onVesselSelect() {
       const name = document.getElementById('vesselName').value;
       const vessel = vesselList.find(v => v.name === name);
-      if (!vessel) return;
       const fields = ['imoNumber', 'grossTonnage', 'dwt', 'loa', 'beam', 'flag', 'propulsion'];
       for (const key of fields) {
         const el = document.getElementById(key);
-        if (el && vessel[key]) el.value = vessel[key];
+        // Always sync to the newly selected vessel, clearing any field it
+        // has no saved value for — otherwise a field left blank on the
+        // selected vessel just keeps showing whatever the previous
+        // vessel (or a manual edit) had left in it.
+        if (el) el.value = (vessel && vessel[key]) ? vessel[key] : '';
       }
       updateStateBackupStore();
     }
@@ -920,18 +1063,6 @@
         else box.classList.add('hidden');
       }
       updateStateBackupStore();
-    }
-
-    function toggleDrawerNode(id) {
-      const el = document.getElementById(id);
-      const arrow = document.getElementById('drawer-arrow');
-      if(el.classList.contains('hidden')) {
-        el.classList.remove('hidden');
-        arrow.textContent = "▲ Collapse";
-      } else {
-        el.classList.add('hidden');
-        arrow.textContent = "▼ Expand";
-      }
     }
 
     function evaluateThrustLogic() {

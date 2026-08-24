@@ -1,0 +1,1457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ports North Pilotage Certificate</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <meta name="theme-color" content="#0a3d62">
+  <link rel="stylesheet" href="css/tailwind.css">
+  <script src="js/signature_pad.min.js"></script>
+  <script src="js/localforage.min.js"></script>
+  <script src="js/jspdf.umd.min.js"></script>
+</head>
+<body class="bg-slate-900 text-gray-100 font-sans min-h-screen pb-12 select-none">
+
+  <!-- LOCAL PIN LOCK SCREEN (offline-only device lock, not a real login) -->
+  <div id="lock-screen" class="fixed inset-0 z-[100] bg-slate-950 flex items-center justify-center p-6" style="display:none;">
+    <div class="w-full max-w-xs bg-slate-800 border border-slate-700 rounded-2xl p-6 space-y-4 text-center">
+      <div class="text-3xl">🔒</div>
+      <h2 id="lock-title" class="text-lg font-bold uppercase tracking-wide">Enter PIN</h2>
+      <p id="lock-subtitle" class="text-xs text-slate-400">This app is locked on this device.</p>
+
+      <input id="lock-pin-input" type="text" name="app-code-1" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="••••" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" style="-webkit-text-security: disc; text-security: disc;" class="w-full text-center text-2xl tracking-[0.5em] p-3 rounded-lg bg-slate-700 border border-slate-600 text-white focus:outline-none">
+      <input id="lock-pin-confirm" type="text" name="app-code-2" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="Confirm PIN" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" style="-webkit-text-security: disc; text-security: disc; display:none;" class="w-full text-center text-lg tracking-[0.4em] p-3 rounded-lg bg-slate-700 border border-slate-600 text-white focus:outline-none">
+
+      <p id="lock-error" class="text-xs text-rose-400 h-3"></p>
+
+      <button id="lock-submit-btn" type="button" onclick="handleLockSubmit()" class="w-full py-2.5 rounded-lg bg-blue-600 font-bold text-sm uppercase tracking-wide">Unlock</button>
+      <button id="lock-forgot-btn" type="button" onclick="handleForgotPin()" class="text-[11px] text-slate-500 underline">Forgot PIN? Reset app lock</button>
+    </div>
+  </div>
+
+  <!-- IN-APP DIALOG (replaces native prompt/confirm/alert, which don't
+       reliably show an input box when the app is running installed/standalone) -->
+  <div id="app-modal" class="fixed inset-0 z-[90] bg-black/60 flex items-center justify-center p-6" style="display:none;">
+    <div class="w-full max-w-xs bg-slate-800 border border-slate-700 rounded-2xl p-5 space-y-3 text-center">
+      <h3 id="app-modal-title" class="text-base font-bold uppercase tracking-wide"></h3>
+      <p id="app-modal-message" class="text-xs text-slate-300"></p>
+      <input id="app-modal-input" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" class="w-full p-2.5 rounded-lg bg-slate-700 border border-slate-600 text-white text-sm text-center focus:outline-none" style="display:none;">
+      <div class="flex gap-2 pt-1">
+        <button id="app-modal-cancel" type="button" class="flex-1 py-2 rounded-lg bg-slate-600 font-bold text-xs uppercase">Cancel</button>
+        <button id="app-modal-ok" type="button" class="flex-1 py-2 rounded-lg bg-blue-600 font-bold text-xs uppercase">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- App Header -->
+  <header class="bg-[#0a3d62] p-4 shadow-lg sticky top-0 z-50 flex justify-between items-center border-b border-blue-400">
+    <div class="flex items-center gap-2">
+      <div class="w-8 h-8 rounded-full bg-white flex items-center justify-center overflow-hidden">
+        <img src="icons/ports-north-logo.png" alt="Ports North" class="w-7 h-7 object-contain">
+      </div>
+      <div class="leading-tight">
+        <h1 class="text-md font-bold tracking-wider uppercase">Ports North Form</h1>
+        <span id="port-badge" class="text-[10px] text-blue-300 font-semibold tracking-wide block">--</span>
+      </div>
+    </div>
+    <div class="flex items-center gap-1">
+      <span class="bg-emerald-600 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">Mobile Grid V21</span>
+      <button type="button" onclick="promptChangePin()" title="Change PIN" class="bg-slate-700 hover:bg-slate-600 text-[10px] px-2 py-1 rounded-full font-bold">⚙️</button>
+    </div>
+  </header>
+
+  <main class="max-w-xl mx-auto p-3 space-y-4">
+
+    <!-- SECTION 1: CORE VOYAGE LOGISTICS -->
+    <section class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-md space-y-3">
+      <h2 class="text-blue-400 font-bold text-xs uppercase tracking-wider border-b border-slate-700 pb-1">1. Voyage & Core Identification</h2>
+
+      <div>
+        <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Port</label>
+        <select id="port" onchange="onPortChange()" class="w-full p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-sm focus:outline-none text-right font-bold"></select>
+      </div>
+
+      <div class="space-y-2 bg-slate-750 p-2.5 rounded-lg border border-slate-700">
+        <div class="flex justify-between items-center">
+          <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Assigned Pilots</label>
+          <button type="button" onclick="addNewListItem('pilotName1', 'Pilot Roster')" class="text-[10px] bg-slate-600 px-2 py-0.5 rounded font-bold text-white">+ Add Pilot Name</button>
+        </div>
+        <div class="space-y-1.5">
+          <div class="flex items-center gap-2">
+            <span class="text-[10px] text-blue-400 font-bold w-16 text-left">Pilot 1*</span>
+            <select id="pilotName1" onchange="syncPilotLabel(this.value)" class="flex-1 p-2 rounded bg-slate-700 border border-slate-600 text-white text-xs focus:outline-none text-right"></select>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-[10px] text-slate-400 font-medium w-16 text-left">Pilot 2</span>
+            <select id="pilotName2" class="flex-1 p-2 rounded bg-slate-700 border border-slate-600 text-white text-xs focus:outline-none text-right">
+              <option value="">-- None --</option>
+            </select>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-[10px] text-slate-400 font-medium w-16 text-left">Pilot 3</span>
+            <select id="pilotName3" class="flex-1 p-2 rounded bg-slate-700 border border-slate-600 text-white text-xs focus:outline-none text-right">
+              <option value="">-- None --</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Date</label>
+          <input type="date" id="date" class="w-full p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-sm focus:outline-none text-right">
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Movement Type</label>
+          <div class="grid grid-cols-3 gap-1">
+            <label class="flex items-center justify-center py-2 border border-slate-600 rounded-lg bg-slate-700 text-xs font-bold cursor-pointer has-[:checked]:bg-blue-900 has-[:checked]:border-blue-500"><input type="radio" name="movement" value="ARR" checked onclick="toggleRemLogic('ARR')" class="sr-only"> ARR</label>
+            <label class="flex items-center justify-center py-2 border border-slate-600 rounded-lg bg-slate-700 text-xs font-bold cursor-pointer has-[:checked]:bg-blue-900 has-[:checked]:border-blue-500"><input type="radio" name="movement" value="DEP" onclick="toggleRemLogic('DEP')" class="sr-only"> DEP</label>
+            <label class="flex items-center justify-center py-2 border border-slate-600 rounded-lg bg-slate-700 text-xs font-bold cursor-pointer has-[:checked]:bg-blue-900 has-[:checked]:border-blue-500"><input type="radio" name="movement" value="REM" onclick="toggleRemLogic('REM')" class="sr-only"> REM</label>
+          </div>
+        </div>
+      </div>
+
+      <div id="rem-duration-box" class="hidden bg-slate-750 p-2 rounded-lg border border-dashed border-slate-600 space-y-1">
+        <label class="block text-[9px] font-bold uppercase tracking-wider text-slate-400 text-left">Removal Duration</label>
+        <div class="grid grid-cols-3 gap-1">
+          <label class="flex items-center justify-center py-1.5 border border-slate-600 rounded-md bg-slate-700 text-[11px] cursor-pointer has-[:checked]:bg-blue-950 has-[:checked]:border-blue-400"><input type="radio" name="duration" value="<3'" checked class="sr-only"> &lt;3'</label>
+          <label class="flex items-center justify-center py-1.5 border border-slate-600 rounded-md bg-slate-700 text-[11px] cursor-pointer has-[:checked]:bg-blue-950 has-[:checked]:border-blue-400"><input type="radio" name="duration" value="3-10'" class="sr-only"> 3-10'</label>
+          <label class="flex items-center justify-center py-1.5 border border-slate-600 rounded-md bg-slate-700 text-[11px] cursor-pointer has-[:checked]:bg-blue-950 has-[:checked]:border-blue-400"><input type="radio" name="duration" value=">10'" class="sr-only"> &gt;10'</label>
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Vessel Name</label>
+        <div class="flex gap-1">
+          <select id="vesselName" onchange="onVesselSelect()" class="flex-1 p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-sm focus:outline-none text-right font-bold"></select>
+          <button type="button" onclick="addNewVesselPrompt()" class="px-3 bg-slate-600 rounded-lg text-sm font-bold">+</button>
+          <button type="button" onclick="deleteActiveVessel()" class="px-3 bg-rose-950 border border-rose-800 rounded-lg text-xs font-bold text-rose-400">×</button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2">
+        <div class="flex flex-col">
+          <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">From Station / Berth</label>
+          <div class="flex gap-1 h-10">
+            <select id="fromLoc" class="flex-1 p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-xs focus:outline-none text-right"></select>
+            <button type="button" onclick="addNewListItem('fromLoc', 'Station')" class="px-2.5 bg-slate-600 rounded-lg text-xs font-bold">+</button>
+          </div>
+        </div>
+        <div class="flex flex-col">
+          <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">TO Station / Berth</label>
+          <div class="flex gap-1 h-10">
+            <select id="toLoc" class="flex-1 p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-xs focus:outline-none text-right"></select>
+            <button type="button" onclick="addNewListItem('toLoc', 'Station')" class="px-2.5 bg-slate-600 rounded-lg text-xs font-bold">+</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 2: VESSEL PARTICULARS -->
+    <section class="bg-slate-800 rounded-xl border border-slate-700 shadow-md overflow-hidden">
+      <button type="button" onclick="toggleDrawerNode('specs-drawer')" class="w-full p-4 flex justify-between items-center text-left focus:outline-none">
+        <h2 class="text-blue-400 font-bold text-xs uppercase tracking-wider">2. Vessel Specifications (Particulars)</h2>
+        <span id="drawer-arrow" class="text-xs text-slate-400 transition-transform">▼ Expand</span>
+      </button>
+
+      <div id="specs-drawer" class="hidden p-4 border-t border-slate-700 bg-slate-800/50 space-y-3">
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Draft Fore (xx.x)</label>
+            <input type="number" step="0.1" inputmode="decimal" id="draftFore" placeholder="0.0" class="w-full p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-sm focus:outline-none text-right">
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Draft Aft (xx.x)</label>
+            <input type="number" step="0.1" inputmode="decimal" id="draftAft" placeholder="0.0" class="w-full p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-sm focus:outline-none text-right">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">IMO (7 Digits)</label>
+            <input type="text" inputmode="numeric" pattern="[0-9]{7}" maxlength="7" id="imoNumber" placeholder="1234567" class="w-full p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-sm focus:outline-none text-right">
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Gross Tonnage</label>
+            <input type="number" min="0" inputmode="numeric" pattern="[0-9]*" id="grossTonnage" placeholder="Tons" class="w-full p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-sm focus:outline-none text-right">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Flag</label>
+            <div class="flex gap-1">
+              <select id="flag" class="flex-1 p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-xs focus:outline-none text-right"></select>
+              <button type="button" onclick="addNewListItem('flag', 'Flag')" class="px-2 bg-slate-600 rounded-lg text-xs font-bold">+</button>
+            </div>
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Call Sign</label>
+            <input type="text" id="callSign" class="w-full p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-sm focus:outline-none text-right">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Deadweight (DWT)</label>
+            <input type="number" min="0" inputmode="numeric" pattern="[0-9]*" id="dwt" placeholder="DWT" class="w-full p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-sm focus:outline-none text-right">
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">I.T. Cert (69)</label>
+            <div class="grid grid-cols-2 gap-1">
+              <label class="flex items-center justify-center py-2 border border-slate-600 rounded-lg bg-slate-700 text-xs font-bold cursor-pointer has-[:checked]:bg-blue-900 has-[:checked]:border-blue-500"><input type="radio" name="itCert" value="Yes" checked class="sr-only"> YES</label>
+              <label class="flex items-center justify-center py-2 border border-slate-600 rounded-lg bg-slate-700 text-xs font-bold cursor-pointer has-[:checked]:bg-blue-900 has-[:checked]:border-blue-500"><input type="radio" name="itCert" value="No" class="sr-only"> NO</label>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-1">
+          <div>
+            <label class="block text-[9px] font-bold uppercase tracking-wider text-slate-400 text-left">LOA (m)</label>
+            <input type="number" step="0.1" inputmode="decimal" id="loa" placeholder="Length" class="w-full p-1.5 rounded bg-slate-700 border border-slate-600 text-xs text-white focus:outline-none text-right">
+          </div>
+          <div>
+            <label class="block text-[9px] font-bold uppercase tracking-wider text-slate-400 text-left">Breadth (m)</label>
+            <input type="number" step="0.1" inputmode="decimal" id="beam" placeholder="Beam" class="w-full p-1.5 rounded bg-slate-700 border border-slate-600 text-xs text-white focus:outline-none text-right">
+          </div>
+          <div>
+            <label class="block text-[9px] font-bold uppercase tracking-wider text-slate-400 text-left">Build (YYYY)</label>
+            <input type="number" inputmode="numeric" pattern="[0-9]*" id="buildDate" placeholder="Year" class="w-full p-1.5 rounded bg-slate-700 border border-slate-600 text-xs text-white focus:outline-none text-right">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Props Configuration</label>
+            <div class="grid grid-cols-3 gap-1 text-[10px]">
+              <label class="flex items-center justify-center py-1.5 border border-slate-600 rounded-md bg-slate-700 font-bold cursor-pointer has-[:checked]:bg-blue-900 has-[:checked]:border-blue-500"><input type="radio" name="props" value="Single" checked class="sr-only"> Single</label>
+              <label class="flex items-center justify-center py-1.5 border border-slate-600 rounded-md bg-slate-700 font-bold cursor-pointer has-[:checked]:bg-blue-900 has-[:checked]:border-blue-500"><input type="radio" name="props" value="Twin" class="sr-only"> Twin</label>
+              <label class="flex items-center justify-center py-1.5 border border-slate-600 rounded-md bg-slate-700 font-bold cursor-pointer has-[:checked]:bg-blue-900 has-[:checked]:border-blue-500"><input type="radio" name="props" value="Multi" class="sr-only"> Multi</label>
+            </div>
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Pitch</label>
+            <div class="grid grid-cols-2 gap-1">
+              <label class="flex items-center justify-center py-1.5 border border-slate-600 rounded-md bg-slate-700 text-[10px] font-bold cursor-pointer has-[:checked]:bg-blue-900 has-[:checked]:border-blue-500"><input type="radio" name="pitch" value="Fixed" checked class="sr-only"> Fixed</label>
+              <label class="flex items-center justify-center py-1.5 border border-slate-600 rounded-md bg-slate-700 text-[10px] font-bold cursor-pointer has-[:checked]:bg-blue-900 has-[:checked]:border-blue-500"><input type="radio" name="pitch" value="Controllable" class="sr-only"> C/P</label>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Propulsion Type</label>
+            <div class="flex gap-1">
+              <select id="propulsion" class="flex-1 p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-xs focus:outline-none text-right"></select>
+              <button type="button" onclick="addNewListItem('propulsion', 'Type')" class="px-2 bg-slate-600 rounded-lg text-xs font-bold">+</button>
+            </div>
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Service Speed (kts)</label>
+            <input type="number" step="0.1" inputmode="decimal" id="speed" placeholder="XX" class="w-full p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-sm focus:outline-none text-right">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Thrust Configuration</label>
+          <div class="grid grid-cols-4 gap-1 text-[9px] font-bold">
+            <label class="flex items-center justify-center py-1.5 border border-slate-600 rounded-md bg-slate-700 cursor-pointer has-[:checked]:bg-blue-900 has-[:checked]:border-blue-500"><input type="radio" name="thrust" value="None" checked onclick="evaluateThrustLogic()" class="sr-only"> None</label>
+            <label class="flex items-center justify-center py-1.5 border border-slate-600 rounded-md bg-slate-700 cursor-pointer has-[:checked]:bg-blue-900 has-[:checked]:border-blue-500"><input type="radio" name="thrust" value="Bow" onclick="evaluateThrustLogic()" class="sr-only"> Bow</label>
+            <label class="flex items-center justify-center py-1.5 border border-slate-600 rounded-md bg-slate-700 cursor-pointer"><input type="radio" name="thrust" value="Stern" onclick="evaluateThrustLogic()" class="sr-only"> Stern</label>
+            <label class="flex items-center justify-center py-1.5 border border-slate-600 rounded-md bg-slate-700 cursor-pointer has-[:checked]:bg-blue-900 has-[:checked]:border-blue-500"><input type="radio" name="thrust" value="Bow+Stern" onclick="evaluateThrustLogic()" class="sr-only"> B+S</label>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Thrust Power Source</label>
+            <div class="grid grid-cols-3 gap-1 text-[10px] font-bold">
+              <label id="lbl-tPower-Motor" class="flex items-center justify-center py-1.5 border border-slate-600 rounded-md bg-slate-700 cursor-pointer has-[:checked]:bg-blue-900 has-[:checked]:border-blue-500"><input type="radio" name="tPower" value="Motor" class="sr-only"> Motor</label>
+              <label id="lbl-tPower-Electric" class="flex items-center justify-center py-1.5 border border-slate-600 rounded-md bg-slate-700 cursor-pointer has-[:checked]:bg-blue-900 has-[:checked]:border-blue-500"><input type="radio" name="tPower" value="Electric" class="sr-only"> Electric</label>
+              <label id="lbl-tPower-NA" class="flex items-center justify-center py-1.5 border border-slate-600 rounded-md bg-slate-700 cursor-pointer has-[:checked]:bg-blue-900 has-[:checked]:border-blue-500"><input type="radio" name="tPower" value="N/A" checked class="sr-only"> N/A</label>
+            </div>
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Helo Operations</label>
+            <select id="helo" class="w-full p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-xs focus:outline-hidden text-right">
+              <option value="Yes">Yes</option>
+              <option value="No">No</option>
+              <option value=">18m">&gt;18m</option>
+              <option value=">22m">&gt;22m</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2 pt-1">
+          <div class="flex items-center justify-between p-2 rounded-lg bg-slate-750 border border-slate-700 text-xs">
+            <select id="rudders" class="p-1 rounded bg-slate-600 text-white text-[11px] text-right">
+              <option value="Single">Single</option>
+              <option value="Twin">Twin</option>
+              <option value="Special">Special</option>
+            </select>
+            <label class="font-bold uppercase text-slate-400 ml-2 text-left">Rudders</label>
+          </div>
+          <div class="flex items-center justify-between p-2 rounded-lg bg-slate-750 border border-slate-700 text-xs">
+            <div class="grid grid-cols-2 gap-0.5">
+              <label class="px-2 py-0.5 border border-slate-600 bg-slate-700 text-[10px] rounded-sm text-center has-[:checked]:bg-blue-900"><input type="radio" name="bulbBow" value="Yes" checked class="sr-only"> Y</label>
+              <label class="px-2 py-0.5 border border-slate-600 bg-slate-700 text-[10px] rounded-sm text-center has-[:checked]:bg-blue-900"><input type="radio" name="bulbBow" value="No" class="sr-only"> N</label>
+            </div>
+            <label class="font-bold uppercase text-slate-400 ml-2 text-left">Bulb Bow</label>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-1 text-[9px] font-bold bg-slate-750 p-2 rounded-lg border border-slate-700">
+          <div>
+            <label class="block text-slate-400 uppercase mb-0.5 text-left">Double Hull</label>
+            <div class="grid grid-cols-2 gap-0.5">
+              <label class="flex items-center justify-center py-1 border border-slate-600 rounded-sm bg-slate-700 has-[:checked]:bg-blue-900"><input type="radio" name="doubleHull" value="Yes" checked class="sr-only"> Y</label>
+              <label class="flex items-center justify-center py-1 border border-slate-600 rounded-sm bg-slate-700 has-[:checked]:bg-blue-900"><input type="radio" name="doubleHull" value="No" class="sr-only"> N</label>
+            </div>
+          </div>
+          <div>
+            <label class="block text-slate-400 uppercase mb-0.5 text-left">Inert Gas</label>
+            <div class="grid grid-cols-2 gap-0.5">
+              <label class="flex items-center justify-center py-1 border border-slate-600 rounded-sm bg-slate-700 has-[:checked]:bg-blue-900"><input type="radio" name="inertGas" value="Yes" checked class="sr-only"> Y</label>
+              <label class="flex items-center justify-center py-1 border border-slate-600 rounded-sm bg-slate-700 has-[:checked]:bg-blue-900"><input type="radio" name="inertGas" value="No" class="sr-only"> N</label>
+            </div>
+          </div>
+          <div>
+            <label class="block text-slate-400 uppercase mb-0.5 text-left">SBT</label>
+            <div class="grid grid-cols-2 gap-0.5">
+              <label class="flex items-center justify-center py-1 border border-slate-600 rounded-sm bg-slate-700 has-[:checked]:bg-blue-900"><input type="radio" name="sbt" value="Yes" checked class="sr-only"> Y</label>
+              <label class="flex items-center justify-center py-1 border border-slate-600 rounded-sm bg-slate-700 has-[:checked]:bg-blue-900"><input type="radio" name="sbt" value="No" class="sr-only"> N</label>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-slate-750 p-2.5 rounded-lg border border-slate-700 space-y-2 text-left">
+          <div class="flex justify-between items-center">
+            <label class="flex items-center gap-1.5 text-xs text-amber-400 font-bold cursor-pointer">
+              <input type="checkbox" id="ballastNA" onchange="toggleBallastNAFieldRules(this.checked)" class="rounded bg-slate-700 border-slate-600 checked:bg-blue-600"> Ballast Not Applicable (N/A)
+            </label>
+            <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Ballast Entry</span>
+          </div>
+          
+          <div class="grid grid-cols-2 gap-2">
+            <div id="wrapper-ballastTons">
+              <label class="block text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-0.5 text-left">Discharge (Tons)</label>
+              <input type="number" min="0" inputmode="numeric" pattern="[0-9]*" id="ballastTons" placeholder="Tons" class="w-full p-1.5 rounded bg-slate-700 border border-slate-600 text-xs text-white text-right focus:outline-none">
+            </div>
+            <div id="wrapper-ballastPlace">
+              <label class="block text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-0.5 text-left">Ballast Position</label>
+              <div class="grid grid-cols-4 gap-0.5 text-[9px] font-black">
+                <label class="flex items-center justify-center py-1 border border-slate-600 rounded-sm bg-slate-700 cursor-pointer has-[:checked]:bg-blue-900"><input type="radio" name="ballastPlace" value="At Roads" checked class="sr-only"> Rds</label>
+                <label class="flex items-center justify-center py-1 border border-slate-600 rounded-sm bg-slate-700 cursor-pointer has-[:checked]:bg-blue-900"><input type="radio" name="ballastPlace" value="At Anchor" class="sr-only"> Anc</label>
+                <label class="flex items-center justify-center py-1 border border-slate-600 rounded-sm bg-slate-700 cursor-pointer has-[:checked]:bg-blue-900"><input type="radio" name="ballastPlace" value="Enroute" class="sr-only"> Enr</label>
+                <label class="flex items-center justify-center py-1 border border-slate-600 rounded-sm bg-slate-700 cursor-pointer has-[:checked]:bg-blue-900"><input type="radio" name="ballastPlace" value="In Port" class="sr-only"> Prt</label>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 3: TIMINGS AND TRANSIT DETAILS -->
+    <section class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-md space-y-4">
+      <h2 class="text-blue-400 font-bold text-xs uppercase tracking-wider border-b border-slate-700 pb-1 text-left">3. Timings & Transit Logs</h2>
+      
+      <div class="bg-slate-750 p-3 rounded-lg border border-slate-700 space-y-3">
+        <div class="border-b border-slate-700/50 pb-1 text-[10px] font-black uppercase text-slate-400 tracking-wider">Station Timestamps</div>
+        
+        <div class="space-y-2">
+          <div>
+            <label class="block text-[10px] font-bold text-slate-400 mb-0.5">Depart Station</label>
+            <div class="flex gap-1">
+              <input type="text" id="day_timeDepStation" class="w-12 p-2 rounded-md bg-slate-700 border border-slate-600 text-center text-xs font-bold text-blue-300" placeholder="DD">
+              <input type="time" id="clock_timeDepStation" onchange="mergePickerFields('timeDepStation')" class="flex-1 p-2 rounded-md bg-slate-700 border border-slate-600 text-xs text-white focus:outline-none text-right">
+            </div>
+            <input type="hidden" id="timeDepStation">
+          </div>
+
+          <div>
+            <label class="block text-[10px] font-bold text-slate-400 mb-0.5">Pilot on Board</label>
+            <div class="flex gap-1">
+              <input type="text" id="day_timePilotOnBoard" class="w-12 p-2 rounded-md bg-slate-700 border border-slate-600 text-center text-xs font-bold text-blue-300" placeholder="DD">
+              <input type="time" id="clock_timePilotOnBoard" onchange="mergePickerFields('timePilotOnBoard')" class="flex-1 p-2 rounded-md bg-slate-700 border border-slate-600 text-xs text-white focus:outline-none text-right">
+            </div>
+            <input type="hidden" id="timePilotOnBoard">
+          </div>
+
+          <div>
+            <label class="block text-[10px] font-bold text-slate-400 mb-0.5">Disembark</label>
+            <div class="flex gap-1">
+              <input type="text" id="day_timeDisembark" class="w-12 p-2 rounded-md bg-slate-700 border border-slate-600 text-center text-xs font-bold text-blue-300" placeholder="DD">
+              <input type="time" id="clock_timeDisembark" onchange="mergePickerFields('timeDisembark')" class="flex-1 p-2 rounded-md bg-slate-700 border border-slate-600 text-xs text-white focus:outline-none text-right">
+            </div>
+            <input type="hidden" id="timeDisembark">
+          </div>
+
+          <div>
+            <label class="block text-[10px] font-bold text-slate-400 mb-0.5">Arrive Station</label>
+            <div class="flex gap-1">
+              <input type="text" id="day_timeArrStation" class="w-12 p-2 rounded-md bg-slate-700 border border-slate-600 text-center text-xs font-bold text-blue-300" placeholder="DD">
+              <input type="time" id="clock_timeArrStation" onchange="mergePickerFields('timeArrStation')" class="flex-1 p-2 rounded-md bg-slate-700 border border-slate-600 text-xs text-white focus:outline-none text-right">
+            </div>
+            <input type="hidden" id="timeArrStation">
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Transfer By</label>
+        <div class="grid grid-cols-4 gap-1 text-[10px] font-bold">
+          <label class="flex items-center justify-center py-2 border border-slate-600 rounded-md bg-slate-700 cursor-pointer has-[:checked]:bg-blue-900"><input type="radio" name="transferBy" value="Helo" checked class="sr-only"> Helo</label>
+          <label class="flex items-center justify-center py-2 border border-slate-600 rounded-md bg-slate-700 cursor-pointer has-[:checked]:bg-blue-900"><input type="radio" name="transferBy" value="Pilot Boat" class="sr-only"> P/Boat</label>
+          <label class="flex items-center justify-center py-2 border border-slate-600 rounded-md bg-slate-700 cursor-pointer has-[:checked]:bg-blue-900"><input type="radio" name="transferBy" value="Car" class="sr-only"> Car</label>
+          <label class="flex items-center justify-center py-2 border border-slate-600 rounded-md bg-slate-700 cursor-pointer has-[:checked]:bg-blue-900"><input type="radio" name="transferBy" value="Other" class="sr-only"> Other</label>
+        </div>
+      </div>
+
+      <div class="bg-slate-750 p-3 rounded-lg border border-slate-700 space-y-2">
+        <div class="text-[10px] font-black uppercase text-slate-400 tracking-wider">Outport Logistics HQ Logs</div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-[9px] font-bold text-slate-400 mb-0.5">Outport Depart</label>
+            <div class="flex gap-0.5">
+              <input type="text" id="day_timeOutportDep" class="w-8 p-1.5 rounded-l-md bg-slate-700 border border-slate-600 text-center text-xs font-bold text-blue-300" placeholder="DD">
+              <input type="time" id="clock_timeOutportDep" onchange="mergePickerFields('timeOutportDep')" class="flex-1 p-1.5 rounded-r-md bg-slate-700 border border-slate-600 text-xs text-white focus:outline-none text-right">
+            </div>
+            <input type="hidden" id="timeOutportDep">
+          </div>
+          <div>
+            <label class="block text-[9px] font-bold text-slate-400 mb-0.5">Outport Arrive</label>
+            <div class="flex gap-0.5">
+              <input type="text" id="day_timeOutportArr" class="w-8 p-1.5 rounded-l-md bg-slate-700 border border-slate-600 text-center text-xs font-bold text-blue-300" placeholder="DD">
+              <input type="time" id="clock_timeOutportArr" onchange="mergePickerFields('timeOutportArr')" class="flex-1 p-1.5 rounded-r-md bg-slate-700 border border-slate-600 text-xs text-white focus:outline-none text-right">
+            </div>
+            <input type="hidden" id="timeOutportArr">
+          </div>
+        </div>
+      </div>
+
+      <!-- TEXT FIELD LOGS FOR DURATION ENTRIES -->
+      <div class="grid grid-cols-3 gap-1">
+        <div>
+          <label class="block text-[9px] font-bold uppercase tracking-wider text-slate-400 text-left">Delays (H:MM)</label>
+          <input type="text" inputmode="numeric" pattern="[0-9]*" id="delays" placeholder="0:00" oninput="applyDurationMask(this)" class="w-full p-2 rounded-md bg-slate-700 border border-slate-600 text-xs text-white focus:outline-none text-right font-mono tracking-wide">
+        </div>
+        <div>
+          <label class="block text-[9px] font-bold uppercase tracking-wider text-slate-400 text-left">Standby (H:MM)</label>
+          <input type="text" inputmode="numeric" pattern="[0-9]*" id="standby" placeholder="0:00" oninput="applyDurationMask(this)" class="w-full p-2 rounded-md bg-slate-700 border border-slate-600 text-xs text-white focus:outline-none text-right font-mono tracking-wide">
+        </div>
+        <div>
+          <label class="block text-[9px] font-bold uppercase tracking-wider text-slate-400 text-left">Cancellation</label>
+          <div class="flex gap-0.5">
+            <input type="text" id="day_cancellation" class="w-8 p-2 rounded-l-md bg-slate-700 border border-slate-600 text-center text-xs font-bold text-blue-300" placeholder="DD">
+            <input type="time" id="clock_cancellation" onchange="mergePickerFields('cancellation')" class="flex-1 p-2 rounded-r-md bg-slate-700 border border-slate-600 text-xs text-white focus:outline-none text-right">
+          </div>
+          <input type="hidden" id="cancellation">
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Comments</label>
+        <textarea id="comments" rows="2" placeholder="Enter special circumstances here..." class="w-full p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-xs focus:outline-none text-right"></textarea>
+      </div>
+    </section>
+
+    <!-- SECTION 4: ATTESTATION AND SIGNATURES -->
+    <section class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-md space-y-4 text-right">
+      <h2 class="text-blue-400 font-bold text-xs uppercase tracking-wider border-b border-slate-700 pb-1 text-left">4. Verification & Attestation</h2>
+      
+      <div>
+        <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Master's Name (Print Entry Above Signature)</label>
+        <input type="text" id="masterName" placeholder="e.g. Captain J. Smith" class="w-full p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-sm focus:outline-none text-right">
+      </div>
+
+      <div class="space-y-4 pt-2">
+        <div>
+          <div class="flex justify-between items-center mb-1">
+            <button type="button" onclick="masterPad.clear()" class="text-xs text-rose-400 font-medium">Clear</button>
+            <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 text-left">Signature of Master</span>
+          </div>
+          <div class="relative">
+            <canvas id="master-signature" class="w-full h-24 border border-slate-600 rounded-lg bg-slate-50"></canvas>
+            <button type="button" id="master-signature-lock-btn" onclick="toggleSignatureLock('master-signature')" class="absolute top-1.5 right-1.5 text-[10px] font-bold px-2 py-1 rounded-full bg-slate-800/80 text-slate-200 border border-slate-500">🔒 Tap to Sign</button>
+          </div>
+        </div>
+
+        <div>
+          <div class="flex justify-between items-center mb-1">
+            <button type="button" onclick="pilotPad.clear()" class="text-xs text-rose-400 font-medium">Clear</button>
+            <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400 text-left">
+              Signature of Pilot: <span id="pilot-signature-label" class="text-blue-400 ml-1">BARCHETTI</span>
+            </div>
+          </div>
+          <div class="relative">
+            <canvas id="pilot-signature" class="w-full h-24 border border-slate-600 rounded-lg bg-slate-50"></canvas>
+            <button type="button" id="pilot-signature-lock-btn" onclick="toggleSignatureLock('pilot-signature')" class="absolute top-1.5 right-1.5 text-[10px] font-bold px-2 py-1 rounded-full bg-slate-800/80 text-slate-200 border border-slate-500">🔒 Tap to Sign</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- BUTTON RUN BLOCK -->
+    <section class="grid grid-cols-2 gap-3 pt-2">
+      <button type="button" onclick="compileCertificatePDF(false)" class="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-xl font-bold text-xs uppercase tracking-wider shadow-md cursor-pointer transition-all">
+        📥 Save Certificate (Local)
+      </button>
+      <button type="button" onclick="compileCertificatePDF(true)" class="w-full bg-slate-700 hover:bg-slate-600 text-white py-3 rounded-xl font-bold text-xs uppercase tracking-wider shadow-md cursor-pointer transition-all">
+        📤 Share / Send Certificate
+      </button>
+    </section>
+
+  </main>
+
+  <script>
+    const defaults = {
+      pilotName: ["BARCHETTI", "CHRISTENSEN", "FRIDOLF", "HUMPHREY", "JOHNSTON", "KILDAL", "OATES", "RAVANAT", "SCHOT", "STANLEY", "SYMONS", "THOMSON", "THORNTON", "WILKINSON"],
+      flag: ["Panama", "Singapore", "Marshall Islands", "Liberia", "Hong Kong", "Australia", "Bahamas"],
+      propulsion: ["Motor", "Diesel Electric", "Steam", "Gas"]
+    };
+
+    // Per-port From/To station & berth code lists. Add new ports here, or extend
+    // an existing port's list from the UI with the "+" button next to From/To Station.
+    const portStations = {
+      "Cairns": {
+        fromLoc: ["PBGA", "PBGB", "PBGC", "PBGD", "SEA", "C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8", "C10", "C12", "C123", "SQO", "MM", "NSB1", "DP", "NOR", "BRSC", "SC1", "SC2", "AUST", "CPS1", "TOM J", "ADM^", "TRS"],
+        toLoc:   ["PBGA", "PBGB", "PBGC", "PBGD", "SEA", "C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8", "C10", "C12", "C123", "SQO", "MM", "NSB1", "DP", "NOR", "BRSC", "SC1", "SC2", "AUST", "CPS1", "TOM J", "ADM^", "TRS"]
+      },
+      "Mourilyan": {
+        fromLoc: ["SEA", "MOO"],
+        toLoc:   ["SEA", "MOO"]
+      },
+      "Cape Flattery": {
+        fromLoc: ["SEA", "CQP"],
+        toLoc:   ["SEA", "CQP"]
+      },
+      "Weipa": {
+        fromLoc: ["SEA", "EL", "LW", "LE", "HUMBUG", "HEY", "HBR", "HEBR"],
+        toLoc:   ["SEA", "EL", "LW", "LE", "HUMBUG", "HEY", "HBR", "HEBR"]
+      },
+      "Karumba": {
+        fromLoc: ["SEA", "KRM"],
+        toLoc:   ["SEA", "KRM"]
+      },
+      "Thursday Island": {
+        fromLoc: ["SEA"],
+        toLoc:   ["SEA"]
+      },
+      "Horn Island": {
+        fromLoc: ["SEA"],
+        toLoc:   ["SEA"]
+      }
+    };
+
+    let vesselList = [
+      { name: "MV Coral Trader" },
+      { name: "Pacific Explorer" },
+      { name: "Cairns Express" },
+      { name: "Ocean Sovereign" }
+    ];
+    let masterPad, pilotPad;
+
+    // Small shared getter used outside compileCertificatePDF (which has its own local one).
+    const getVal = id => document.getElementById(id)?.value || '';
+
+    // Older saved vessel lists were plain strings ["MV Coral Trader", ...];
+    // this upgrades them to {name: "..."} objects with no saved specs yet.
+    function normalizeVesselList(list) {
+      return (list || []).map(v => (typeof v === 'string' ? { name: v } : v));
+    }
+
+    // ---- Local PIN lock ----
+    // Device-local convenience lock only: deters casual access to a phone
+    // that's picked up unlocked. There is no server, so it cannot be a real
+    // authentication system - "Forgot PIN" resets it from the same screen
+    // by design, since there's nothing to recover it against.
+    // ---- In-app dialog (replaces native prompt/confirm/alert) ----
+    // Native browser prompt()/confirm()/alert() popups don't reliably show
+    // a usable text-input box once this app is running installed/standalone
+    // (no browser chrome for them to attach to on a lot of Android
+    // browsers). This is a self-contained replacement that always works.
+    function showAppModal({ title = '', message = '', hasInput = false, placeholder = '', confirmLabel = 'OK', cancelLabel = 'Cancel' }) {
+      return new Promise(resolve => {
+        const overlay = document.getElementById('app-modal');
+        document.getElementById('app-modal-title').textContent = title;
+        document.getElementById('app-modal-message').textContent = message;
+        const input = document.getElementById('app-modal-input');
+        const okBtn = document.getElementById('app-modal-ok');
+        const cancelBtn = document.getElementById('app-modal-cancel');
+
+        input.style.display = hasInput ? 'block' : 'none';
+        input.value = '';
+        input.placeholder = placeholder;
+        okBtn.textContent = confirmLabel;
+        cancelBtn.style.display = cancelLabel ? 'inline-block' : 'none';
+        cancelBtn.textContent = cancelLabel || '';
+
+        overlay.style.display = 'flex';
+        if (hasInput) setTimeout(() => input.focus(), 50);
+
+        function cleanup(result) {
+          overlay.style.display = 'none';
+          okBtn.removeEventListener('click', onOk);
+          cancelBtn.removeEventListener('click', onCancel);
+          input.removeEventListener('keydown', onKeydown);
+          resolve(result);
+        }
+        function onOk() { cleanup(hasInput ? (input.value.trim() || null) : true); }
+        function onCancel() { cleanup(null); }
+        function onKeydown(e) { if (e.key === 'Enter') onOk(); }
+
+        okBtn.addEventListener('click', onOk);
+        cancelBtn.addEventListener('click', onCancel);
+        if (hasInput) input.addEventListener('keydown', onKeydown);
+      });
+    }
+
+    function showAppAlert(message, title = '') {
+      return showAppModal({ title, message, hasInput: false, confirmLabel: 'OK', cancelLabel: null });
+    }
+
+    function showAppConfirm(message, title = '') {
+      return showAppModal({ title, message, hasInput: false, confirmLabel: 'Confirm', cancelLabel: 'Cancel' });
+    }
+
+    function showAppPrompt(message, title = '', placeholder = '') {
+      return showAppModal({ title, message, hasInput: true, placeholder, confirmLabel: 'OK', cancelLabel: 'Cancel' });
+    }
+
+    const PIN_HASH_KEY = 'pnorth_v21_pin_hash';
+    let lockMode = 'unlock'; // 'unlock' | 'setup'
+
+    async function sha256Hex(str) {
+      const enc = new TextEncoder().encode('pnorth-pilotage-' + str);
+      const buf = await crypto.subtle.digest('SHA-256', enc);
+      return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    async function initLockScreen() {
+      let hash = null;
+      try { hash = await localforage.getItem(PIN_HASH_KEY); } catch (e) {}
+      const unlockedThisSession = sessionStorage.getItem('pnorth_unlocked') === '1';
+
+      if (!hash) {
+        lockMode = 'setup';
+        showLockScreen();
+      } else if (!unlockedThisSession) {
+        lockMode = 'unlock';
+        showLockScreen();
+      }
+    }
+
+    function showLockScreen() {
+      const screen = document.getElementById('lock-screen');
+      const title = document.getElementById('lock-title');
+      const subtitle = document.getElementById('lock-subtitle');
+      const confirmInput = document.getElementById('lock-pin-confirm');
+      const submitBtn = document.getElementById('lock-submit-btn');
+      const forgotBtn = document.getElementById('lock-forgot-btn');
+      const pinInput = document.getElementById('lock-pin-input');
+
+      document.getElementById('lock-error').textContent = '';
+      pinInput.value = '';
+      confirmInput.value = '';
+      // Belt-and-braces: some mobile browsers autofill password-type fields
+      // a beat after the page settles, so clear again shortly after too.
+      setTimeout(() => { pinInput.value = ''; confirmInput.value = ''; }, 300);
+
+      if (lockMode === 'setup') {
+        title.textContent = 'Set a PIN';
+        subtitle.textContent = 'Choose a 4-6 digit PIN to lock this app on this device.';
+        confirmInput.style.display = 'block';
+        submitBtn.textContent = 'Set PIN';
+        forgotBtn.style.display = 'none';
+      } else {
+        title.textContent = 'Enter PIN';
+        subtitle.textContent = 'This app is locked on this device.';
+        confirmInput.style.display = 'none';
+        submitBtn.textContent = 'Unlock';
+        forgotBtn.style.display = 'inline';
+      }
+
+      screen.style.display = 'flex';
+      pinInput.focus();
+    }
+
+    function hideLockScreen() {
+      document.getElementById('lock-screen').style.display = 'none';
+    }
+
+    async function handleLockSubmit() {
+      const pin = document.getElementById('lock-pin-input').value.trim();
+      const errorEl = document.getElementById('lock-error');
+
+      if (!/^\d{4,6}$/.test(pin)) {
+        errorEl.textContent = 'PIN must be 4-6 digits.';
+        return;
+      }
+
+      if (lockMode === 'setup') {
+        const confirmPin = document.getElementById('lock-pin-confirm').value.trim();
+        if (pin !== confirmPin) {
+          errorEl.textContent = 'PINs do not match.';
+          return;
+        }
+        const hash = await sha256Hex(pin);
+        try { await localforage.setItem(PIN_HASH_KEY, hash); } catch (e) {}
+        sessionStorage.setItem('pnorth_unlocked', '1');
+        hideLockScreen();
+        return;
+      }
+
+      let savedHash = null;
+      try { savedHash = await localforage.getItem(PIN_HASH_KEY); } catch (e) {}
+      const enteredHash = await sha256Hex(pin);
+      if (savedHash && enteredHash === savedHash) {
+        sessionStorage.setItem('pnorth_unlocked', '1');
+        hideLockScreen();
+      } else {
+        errorEl.textContent = 'Incorrect PIN.';
+        document.getElementById('lock-pin-input').value = '';
+      }
+    }
+
+    async function handleForgotPin() {
+      if (!(await showAppConfirm('This clears the saved PIN on this device. Your certificates, vessels and pilots are kept - only the lock itself resets. Continue?', 'Reset PIN'))) return;
+      try { await localforage.removeItem(PIN_HASH_KEY); } catch (e) {}
+      lockMode = 'setup';
+      showLockScreen();
+    }
+
+    function lockAppNow() {
+      sessionStorage.removeItem('pnorth_unlocked');
+      lockMode = 'unlock';
+      showLockScreen();
+    }
+
+    async function promptChangePin() {
+      let savedHash = null;
+      try { savedHash = await localforage.getItem(PIN_HASH_KEY); } catch (e) {}
+      if (!savedHash) { await showAppAlert('No PIN is set yet - tap the lock icon to set one.', 'Change PIN'); return; }
+
+      const current = await showAppPrompt('Enter current PIN:', 'Change PIN', 'Current PIN');
+      if (current === null) return;
+      const currentHash = await sha256Hex(current.trim());
+      if (currentHash !== savedHash) { await showAppAlert('Incorrect current PIN.', 'Change PIN'); return; }
+
+      const next = await showAppPrompt('Enter new PIN (4-6 digits):', 'Change PIN', 'New PIN');
+      if (!next || !/^\d{4,6}$/.test(next.trim())) { await showAppAlert('PIN must be 4-6 digits. No changes made.', 'Change PIN'); return; }
+      const confirmNext = await showAppPrompt('Confirm new PIN:', 'Change PIN', 'Confirm new PIN');
+      if (next.trim() !== (confirmNext || '').trim()) { await showAppAlert('PINs did not match. No changes made.', 'Change PIN'); return; }
+
+      const newHash = await sha256Hex(next.trim());
+      try { await localforage.setItem(PIN_HASH_KEY, newHash); } catch (e) {}
+      await showAppAlert('PIN updated.', 'Change PIN');
+    }
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      initLockScreen();
+      ['lock-pin-input', 'lock-pin-confirm'].forEach(id => {
+        document.getElementById(id).addEventListener('keydown', e => {
+          if (e.key === 'Enter') handleLockSubmit();
+        });
+      });
+      initCanvasDevice("master-signature", pad => masterPad = pad);
+      initCanvasDevice("pilot-signature", pad => pilotPad = pad);
+
+      const now = new Date();
+      const dd = String(now.getDate()).padStart(2, '0');
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const yyyy = now.getFullYear();
+      document.getElementById('date').value = `${yyyy}-${mm}-${dd}`;
+
+      ["timeDepStation", "timePilotOnBoard", "timeDisembark", "timeArrStation", "timeOutportDep", "timeOutportArr", "cancellation"].forEach(id => {
+        const dayEl = document.getElementById("day_" + id);
+        if (dayEl) dayEl.value = dd;
+      });
+
+      try {
+        for (let key in defaults) {
+          if (key === 'pilotName') {
+            let stored = await localforage.getItem('pnorth_v21_pilotName') || defaults.pilotName;
+            renderSelectMenuOptions('pilotName1', stored);
+            renderSelectMenuOptions('pilotName2', ["", ...stored]);
+            renderSelectMenuOptions('pilotName3', ["", ...stored]);
+          } else {
+            let stored = await localforage.getItem('pnorth_v21_' + key) || defaults[key];
+            renderSelectMenuOptions(key, stored);
+          }
+        }
+        let storedVessels = await localforage.getItem('pnorth_v21_vessels') || vesselList;
+        vesselList = normalizeVesselList(storedVessels);
+        renderAlphabeticalVessels();
+
+        // Port setup: populate the Port select, pick up the last-used port
+        // (or the first one) and load that port's From/To station lists.
+        renderSelectMenuOptions('port', Object.keys(portStations));
+        let lastPort = await localforage.getItem('pnorth_v21_lastPort') || Object.keys(portStations)[0];
+        if (!portStations[lastPort]) lastPort = Object.keys(portStations)[0];
+        document.getElementById('port').value = lastPort;
+        document.getElementById('port-badge').textContent = lastPort;
+        await loadPortStations(lastPort);
+
+        await loadPersistentStateData();
+      } catch (e) {
+        renderSelectMenuOptions('pilotName1', defaults.pilotName);
+        renderSelectMenuOptions('pilotName2', ["", ...defaults.pilotName]);
+        renderSelectMenuOptions('pilotName3', ["", ...defaults.pilotName]);
+        for (let key in defaults) if(key !== 'pilotName') renderSelectMenuOptions(key, defaults[key]);
+        renderAlphabeticalVessels();
+
+        const fallbackPort = Object.keys(portStations)[0];
+        renderSelectMenuOptions('port', Object.keys(portStations));
+        document.getElementById('port').value = fallbackPort;
+        document.getElementById('port-badge').textContent = fallbackPort;
+        renderSelectMenuOptions('fromLoc', portStations[fallbackPort].fromLoc);
+        renderSelectMenuOptions('toLoc', portStations[fallbackPort].toLoc);
+      }
+
+      syncPilotLabel(document.getElementById('pilotName1').value);
+      evaluateThrustLogic();
+
+      document.querySelectorAll('input, select, textarea').forEach(el => {
+        el.addEventListener('input', updateStateBackupStore);
+      });
+    });
+
+    function initCanvasDevice(id, assign) {
+      const canvas = document.getElementById(id);
+      const r = Math.max(window.devicePixelRatio || 1, 1);
+      canvas.width = canvas.offsetWidth * r;
+      canvas.height = canvas.offsetHeight * r;
+      canvas.getContext("2d").scale(r, r);
+      const pad = new SignaturePad(canvas, { backgroundColor: 'rgb(248, 250, 252)' });
+      pad.off(); // start locked - page scroll works normally until unlocked
+      assign(pad);
+    }
+
+    // Signature pads capture every touch on the canvas so signature_pad can
+    // draw, which also blocks the page from scrolling past them. Locked by
+    // default: pad.off() stops it capturing touches and touch-none is
+    // removed so a normal scroll gesture passes straight through. Tapping
+    // the button unlocks it (pad.on() + touch-none) so drawing works, at
+    // the cost of not being able to scroll from directly on the pad while
+    // it's unlocked - tap it again to lock and resume scrolling.
+    function toggleSignatureLock(canvasId) {
+      const pad = canvasId === 'master-signature' ? masterPad : pilotPad;
+      const canvas = document.getElementById(canvasId);
+      const btn = document.getElementById(canvasId + '-lock-btn');
+      if (!pad || !canvas || !btn) return;
+
+      const isLocked = !canvas.classList.contains('touch-none');
+      if (isLocked) {
+        canvas.classList.add('touch-none');
+        pad.on();
+        btn.textContent = '🔓 Signing - Tap to Lock';
+        btn.classList.add('bg-emerald-600/90');
+        btn.classList.remove('bg-slate-800/80');
+      } else {
+        canvas.classList.remove('touch-none');
+        pad.off();
+        btn.textContent = '🔒 Tap to Sign';
+        btn.classList.remove('bg-emerald-600/90');
+        btn.classList.add('bg-slate-800/80');
+      }
+    }
+
+    function renderSelectMenuOptions(id, arr) {
+      const el = document.getElementById(id);
+      if(el) el.innerHTML = arr.map(v => `<option value="${v}">${v === "" ? "-- None --" : v}</option>`).join('');
+    }
+
+    function renderAlphabeticalVessels() {
+      vesselList.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+      renderSelectMenuOptions('vesselName', vesselList.map(v => v.name));
+    }
+
+    // Populates the main ship-particular fields from the selected vessel's
+    // saved profile. Draft (fore/aft) is deliberately left untouched since
+    // that changes voyage-to-voyage, not a fixed vessel particular.
+    function onVesselSelect() {
+      const name = document.getElementById('vesselName').value;
+      const vessel = vesselList.find(v => v.name === name);
+      if (!vessel) return;
+      const fields = ['imoNumber', 'grossTonnage', 'dwt', 'loa', 'beam', 'flag', 'propulsion'];
+      for (const key of fields) {
+        const el = document.getElementById(key);
+        if (el && vessel[key]) el.value = vessel[key];
+      }
+      updateStateBackupStore();
+    }
+
+    // Loads the From/To station select options for a given port, preferring
+    // any custom codes previously added via the "+" button for that port,
+    // falling back to the built-in list in portStations.
+    async function loadPortStations(port) {
+      const base = portStations[port] || { fromLoc: ["SEA"], toLoc: ["SEA"] };
+      for (const key of ['fromLoc', 'toLoc']) {
+        let list;
+        try {
+          list = await localforage.getItem(`pnorth_v21_${port}_${key}`) || base[key];
+        } catch (e) {
+          list = base[key];
+        }
+        renderSelectMenuOptions(key, list);
+      }
+    }
+
+    async function onPortChange() {
+      const port = document.getElementById('port').value;
+      document.getElementById('port-badge').textContent = port;
+      await loadPortStations(port);
+      try { await localforage.setItem('pnorth_v21_lastPort', port); } catch (e) {}
+      updateStateBackupStore();
+    }
+
+    function syncPilotLabel(val) {
+      const lbl = document.getElementById('pilot-signature-label');
+      if (lbl) lbl.textContent = val || 'None';
+    }
+
+    function toggleRemLogic(v) {
+      const box = document.getElementById('rem-duration-box');
+      if(box) {
+        if(v === 'REM') box.classList.remove('hidden');
+        else box.classList.add('hidden');
+      }
+      updateStateBackupStore();
+    }
+
+    function toggleDrawerNode(id) {
+      const el = document.getElementById(id);
+      const arrow = document.getElementById('drawer-arrow');
+      if(el.classList.contains('hidden')) {
+        el.classList.remove('hidden');
+        arrow.textContent = "▲ Collapse";
+      } else {
+        el.classList.add('hidden');
+        arrow.textContent = "▼ Expand";
+      }
+    }
+
+    function evaluateThrustLogic() {
+      const thrustVal = document.querySelector('input[name="thrust"]:checked')?.value || 'None';
+      const radMotor = document.querySelector('input[name="tPower"][value="Motor"]');
+      const radElectric = document.querySelector('input[name="tPower"][value="Electric"]');
+      const radNA = document.querySelector('input[name="tPower"][value="N/A"]');
+      
+      if (thrustVal === 'None') {
+        if (radNA) radNA.checked = true;
+        if (radMotor) radMotor.disabled = true;
+        if (radElectric) radElectric.disabled = true;
+        document.getElementById('lbl-tPower-Motor')?.classList.add('opacity-40', 'pointer-events-none');
+        document.getElementById('lbl-tPower-Electric')?.classList.add('opacity-40', 'pointer-events-none');
+      } else {
+        if (radNA && radNA.checked && radMotor) radMotor.checked = true;
+        if (radMotor) radMotor.disabled = false;
+        if (radElectric) radElectric.disabled = false;
+        document.getElementById('lbl-tPower-Motor')?.classList.remove('opacity-40', 'pointer-events-none');
+        document.getElementById('lbl-tPower-Electric')?.classList.remove('opacity-40', 'pointer-events-none');
+      }
+      updateStateBackupStore();
+    }
+
+    function toggleBallastNAFieldRules(checked) {
+      const tonsInput = document.getElementById('ballastTons');
+      const placeRadios = document.querySelectorAll('input[name="ballastPlace"]');
+      if (checked) {
+        if(tonsInput) { tonsInput.value = ''; tonsInput.disabled = true; }
+        placeRadios.forEach(r => r.disabled = true);
+        document.getElementById('wrapper-ballastTons')?.classList.add('opacity-40', 'pointer-events-none');
+        document.getElementById('wrapper-ballastPlace')?.classList.add('opacity-40', 'pointer-events-none');
+      } else {
+        if(tonsInput) tonsInput.disabled = false;
+        placeRadios.forEach(r => r.disabled = false);
+        document.getElementById('wrapper-ballastTons')?.classList.remove('opacity-40', 'pointer-events-none');
+        document.getElementById('wrapper-ballastPlace')?.classList.remove('opacity-40', 'pointer-events-none');
+      }
+      updateStateBackupStore();
+    }
+
+    // Dynamic numeric duration formatting mask helper
+    function applyDurationMask(input) {
+      let clean = input.value.replace(/\D/g, '');
+      if (clean.length > 5) clean = clean.slice(0, 5);
+      
+      if (clean.length > 2) {
+        let mins = parseInt(clean.slice(-2), 10);
+        if (mins > 59) mins = 59;
+        let hrs = clean.slice(0, -2);
+        input.value = `${hrs}:${String(mins).padStart(2, '0')}`;
+      } else if (clean.length > 0) {
+        input.value = clean;
+      }
+    }
+
+    function mergePickerFields(baseId) {
+      const dayVal = document.getElementById("day_" + baseId)?.value || '';
+      const clockVal = document.getElementById("clock_" + baseId)?.value || '';
+      if (dayVal && clockVal) {
+        document.getElementById(baseId).value = `${dayVal}/${clockVal}`;
+      } else {
+        document.getElementById(baseId).value = '';
+      }
+      updateStateBackupStore();
+    }
+
+    function convertTo24HourPrintString(val) {
+      if (!val) return '';
+      if (val.includes('/')) {
+        const parts = val.split('/');
+        return `${parts[0]}/${parts[1]}`;
+      }
+      return val;
+    }
+
+    async function addNewVesselPrompt() {
+      const v = await showAppPrompt("This stores the current IMO / GRT / DWT / LOA / Beam / Flag / Propulsion fields against this vessel, so selecting it next time fills them in automatically.", "Save Vessel", "Vessel name");
+      if (!v || !v.trim()) return;
+      const clean = v.trim();
+
+      const profile = {
+        name: clean,
+        imoNumber: getVal('imoNumber'),
+        grossTonnage: getVal('grossTonnage'),
+        dwt: getVal('dwt'),
+        loa: getVal('loa'),
+        beam: getVal('beam'),
+        flag: getVal('flag'),
+        propulsion: getVal('propulsion')
+      };
+
+      const existingIdx = vesselList.findIndex(x => x.name.toLowerCase() === clean.toLowerCase());
+      if (existingIdx >= 0) {
+        if (!(await showAppConfirm(`"${clean}" is already saved. Update its stored details with the current form values?`, "Update Vessel"))) return;
+        vesselList[existingIdx] = profile;
+      } else {
+        vesselList.push(profile);
+      }
+
+      try { await localforage.setItem('pnorth_v21_vessels', vesselList); } catch(e) {}
+      renderAlphabeticalVessels();
+      document.getElementById('vesselName').value = clean;
+      updateStateBackupStore();
+    }
+
+    async function deleteActiveVessel() {
+      const el = document.getElementById('vesselName');
+      if(!el || !el.value) return;
+      if(await showAppConfirm(`Remove "${el.value}" from saved alphabetized list?`, "Remove Vessel")) {
+        vesselList = vesselList.filter(item => item.name !== el.value);
+        try { await localforage.setItem('pnorth_v21_vessels', vesselList); } catch(e) {}
+        renderAlphabeticalVessels();
+        updateStateBackupStore();
+      }
+    }
+
+    async function addNewListItem(id, typeName) {
+      const v = await showAppPrompt(`Add a custom option for ${typeName}.`, `Add ${typeName}`, typeName);
+      if (!v || !v.trim()) return;
+      const clean = v.trim();
+
+      if (id === 'pilotName1') {
+        // Pilot roster feeds all three pilot dropdowns.
+        try {
+          let currentRoster = await localforage.getItem('pnorth_v21_pilotName') || defaults.pilotName;
+          if (!currentRoster.includes(clean)) {
+            currentRoster.push(clean);
+            await localforage.setItem('pnorth_v21_pilotName', currentRoster);
+          }
+          renderSelectMenuOptions('pilotName1', currentRoster);
+          renderSelectMenuOptions('pilotName2', ["", ...currentRoster]);
+          renderSelectMenuOptions('pilotName3', ["", ...currentRoster]);
+        } catch (e) {
+          const el = document.getElementById('pilotName1');
+          const opts = Array.from(el.options).map(o => o.value).filter(Boolean);
+          if (!opts.includes(clean)) opts.push(clean);
+          renderSelectMenuOptions('pilotName1', opts);
+          renderSelectMenuOptions('pilotName2', ["", ...opts]);
+          renderSelectMenuOptions('pilotName3', ["", ...opts]);
+        }
+        document.getElementById('pilotName1').value = clean;
+        syncPilotLabel(clean);
+
+      } else if (id === 'fromLoc' || id === 'toLoc') {
+        // From/To station codes are specific to the currently selected port.
+        const port = document.getElementById('port')?.value || Object.keys(portStations)[0];
+        const storeKey = `pnorth_v21_${port}_${id}`;
+        const base = (portStations[port] && portStations[port][id]) || [];
+        try {
+          let list = await localforage.getItem(storeKey) || base;
+          if (!list.includes(clean)) {
+            list.push(clean);
+            await localforage.setItem(storeKey, list);
+          }
+          renderSelectMenuOptions(id, list);
+        } catch (e) {
+          const el = document.getElementById(id);
+          const opts = Array.from(el.options).map(o => o.value);
+          if (!opts.includes(clean)) opts.push(clean);
+          renderSelectMenuOptions(id, opts);
+        }
+        document.getElementById(id).value = clean;
+
+      } else {
+        // Generic global single-select fields (Flag, Propulsion Type, etc.)
+        const storeKey = 'pnorth_v21_' + id;
+        try {
+          let list = await localforage.getItem(storeKey) || defaults[id] || [];
+          if (!list.includes(clean)) {
+            list.push(clean);
+            await localforage.setItem(storeKey, list);
+          }
+          renderSelectMenuOptions(id, list);
+        } catch (e) {
+          const el = document.getElementById(id);
+          const opts = Array.from(el.options).map(o => o.value);
+          if (!opts.includes(clean)) opts.push(clean);
+          renderSelectMenuOptions(id, opts);
+        }
+        document.getElementById(id).value = clean;
+      }
+
+      updateStateBackupStore();
+    }
+
+    async function updateStateBackupStore() {
+      try {
+        const state = {};
+        document.querySelectorAll('input, select, textarea').forEach(i => {
+          if (i.type === 'checkbox') {
+            state[i.id] = i.checked;
+          } else if (i.type === 'radio') {
+            if (i.checked) state[i.name] = i.value;
+          } else if (i.id) {
+            state[i.id] = i.value;
+          }
+        });
+        await localforage.setItem('pnorth_v21_state', state);
+      } catch(e) {}
+    }
+
+    async function loadPersistentStateData() {
+      try {
+        const s = await localforage.getItem('pnorth_v21_state');
+        if (!s) return;
+
+        // Load the saved port's From/To station options first, so the
+        // fromLoc/toLoc selects below have the right options to restore into.
+        if (s.port && portStations[s.port]) {
+          document.getElementById('port').value = s.port;
+          document.getElementById('port-badge').textContent = s.port;
+          await loadPortStations(s.port);
+        }
+
+        for (let k in s) {
+          let el = document.getElementById(k);
+          if (el) {
+            if (el.type === 'checkbox') {
+              el.checked = s[k];
+              if(k === 'ballastNA') toggleBallastNAFieldRules(s[k]);
+            } else {
+              el.value = s[k];
+              if (k === 'pilotName1') syncPilotLabel(s[k]);
+            }
+          } else {
+            // Radio groups (movement, thrust, props, etc.) have no element id,
+            // only a name, so they're matched and checked here.
+            let rad = document.querySelector(`input[name="${k}"][value="${s[k]}"]`);
+            if (rad) rad.checked = true;
+          }
+        }
+
+        // Radio-group selections above don't fire their onclick handlers, so
+        // re-run the UI logic that depends on them (REM duration box, thrust
+        // power source enable/disable) now that every value is restored.
+        if (s.movement) toggleRemLogic(s.movement);
+        if (s.thrust) evaluateThrustLogic();
+      } catch(e) {}
+    }
+
+    // Loads an image and resolves once it's actually decoded (or after a
+    // timeout / error), so jsPDF is never handed a not-yet-loaded Image.
+    function loadImageAsync(src, timeoutMs = 1500) {
+      return new Promise(resolve => {
+        const img = new Image();
+        let settled = false;
+        const finish = result => { if (!settled) { settled = true; resolve(result); } };
+        const timer = setTimeout(() => finish(null), timeoutMs);
+        img.onload = () => { clearTimeout(timer); finish(img); };
+        img.onerror = () => { clearTimeout(timer); finish(null); };
+        img.src = src;
+      });
+    }
+
+    async function compileCertificatePDF(dispatchEmail = false) {
+      try {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('p', 'mm', 'a4');
+
+        const getValue = id => document.getElementById(id)?.value || '';
+        const getRadio = name => document.querySelector(`input[name="${name}"]:checked`)?.value || '';
+
+        let pilotChain = getValue('pilotName1');
+        if (getValue('pilotName2')) pilotChain += ` / ${getValue('pilotName2')}`;
+        if (getValue('pilotName3')) pilotChain += ` / ${getValue('pilotName3')}`;
+
+        // Header Title + Port
+        doc.setFont("Helvetica", "bold"); doc.setFontSize(18); doc.text("Pilotage Certificate", 12, 16);
+        doc.setFont("Helvetica", "normal"); doc.setFontSize(10);
+        doc.text(`Port: ${getValue('port') || 'Ports North'}`, 12, 22);
+
+        // Logo asset - the real Ports North logo, bundled locally so it's
+        // always available offline. Falls back to bold text only in the
+        // unlikely case the image can't be decoded.
+        const logoImg = await loadImageAsync('icons/ports-north-logo.png');
+        if (logoImg) {
+          try {
+            doc.addImage(logoImg, 'PNG', 178, 6, 20, 20);
+          } catch (e) {
+            doc.setFont("Helvetica", "bold"); doc.setFontSize(16); doc.text("PORTS NORTH", 198, 16, { align: "right" });
+          }
+        } else {
+          doc.setFont("Helvetica", "bold"); doc.setFontSize(16); doc.text("PORTS NORTH", 198, 16, { align: "right" });
+        }
+
+        let rowH = 7; 
+        let sY = 25;
+        let totalGridHeight = 11 * rowH; 
+
+        let remarksTopY = sY + totalGridHeight;
+        let certTextY = remarksTopY + 31;
+        let sigTopY = certTextY + 4;
+        let absoluteFrameBottomY = sigTopY + 32;
+
+        // Outer Frame Perimeter
+        doc.setDrawColor(0,0,0); doc.setLineWidth(0.4);
+        doc.rect(10, sY, 190, absoluteFrameBottomY - sY); 
+
+        // Internal Horizontal Dividers
+        for (let i = 1; i < 11; i++) {
+          doc.line(10, sY + (i * rowH), 200, sY + (i * rowH));
+        }
+        
+        // Columns Alignment Markers
+        let c1 = 80;  
+        let c2 = 140; 
+        doc.line(c1, sY, c1, sY + totalGridHeight);  
+        doc.line(c2, sY, c2, sY + totalGridHeight); 
+
+        doc.setFontSize(9.5); doc.setFont("Helvetica", "bold");
+
+        // --- ROW POPULATION ENGINE WITH PROTECTION OVERLAP RULES ---
+        // Row 1
+        doc.text("Pilot(s)", 12, sY + 4.5);
+        let currentPilotFontSize = 9.5;
+        if (pilotChain.length > 22) currentPilotFontSize = 7.5;
+        if (pilotChain.length > 34) currentPilotFontSize = 6.0;
+        if (pilotChain.length > 44) currentPilotFontSize = 5.0;
+        doc.setFont("Helvetica", "normal"); doc.setFontSize(currentPilotFontSize);
+        doc.text(pilotChain, c1 - 2, sY + 4.5, { align: "right" });
+        
+        doc.setFont("Helvetica", "bold"); doc.setFontSize(9.5); doc.text("Date", c1 + 2, sY + 4.5); 
+        doc.setFont("Helvetica", "normal");
+        let rawDate = getValue('date');
+        let sortedDateStr = '';
+        if (rawDate) {
+          const splitBits = rawDate.split('-');
+          if(splitBits.length === 3) {
+            const mList = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+            sortedDateStr = `${splitBits[2]}/${mList[parseInt(splitBits[1]) - 1]}/${splitBits[0].slice(-2)}`;
+          }
+        }
+        doc.text(sortedDateStr, c2 - 2, sY + 4.5, { align: "right" });
+        
+        doc.setFont("Helvetica", "bold"); doc.text("Movement", c2 + 2, sY + 4.5); 
+        doc.setFont("Helvetica", "normal");
+        let mvStr = getRadio('movement'); if(mvStr === 'REM') mvStr += ` (${getRadio('duration')})`;
+        doc.text(mvStr, 198, sY + 4.5, { align: "right" });
+
+        // Row 2
+        let rY = sY + rowH;
+        doc.setFont("Helvetica", "bold"); doc.text("Vessel Name", 12, rY + 4.5); 
+        doc.setFont("Helvetica", "bold"); doc.text(getValue('vesselName'), c1 - 2, rY + 4.5, { align: "right" });
+        
+        doc.setFont("Helvetica", "bold"); doc.text("From Berth", c1 + 2, rY + 4.5); 
+        doc.setFont("Helvetica", "normal"); doc.text(getValue('fromLoc'), c2 - 2, rY + 4.5, { align: "right" });
+        
+        doc.setFont("Helvetica", "bold"); doc.text("TO Berth", c2 + 2, rY + 4.5); 
+        doc.setFont("Helvetica", "normal"); doc.text(getValue('toLoc'), 198, rY + 4.5, { align: "right" });
+
+        // Row 3
+        rY += rowH;
+        doc.setFont("Helvetica", "bold"); doc.text("Draft Fore / Aft", 12, rY + 4.5); 
+        doc.setFont("Helvetica", "normal"); doc.text(`${getValue('draftFore')}m / ${getValue('draftAft')}m`, c1 - 2, rY + 4.5, { align: "right" });
+        
+        doc.setFont("Helvetica", "bold"); doc.text("IMO Number", c1 + 2, rY + 4.5); 
+        doc.setFont("Helvetica", "normal"); doc.text(getValue('imoNumber'), c2 - 2, rY + 4.5, { align: "right" });
+
+        doc.setFont("Helvetica", "bold"); doc.text("Depart Station", c2 + 2, rY + 4.5); 
+        doc.setFont("Helvetica", "normal"); doc.text(convertTo24HourPrintString(getValue('timeDepStation')), 198, rY + 4.5, { align: "right" });
+
+        // Row 4
+        rY += rowH;
+        doc.setFont("Helvetica", "bold"); doc.text("Flag / Call Sign", 12, rY + 4.5); 
+        doc.setFont("Helvetica", "normal"); doc.text(`${getValue('flag')} / ${getValue('callSign')}`, c1 - 2, rY + 4.5, { align: "right" });
+        
+        doc.setFont("Helvetica", "bold"); doc.text("Gross Tons", c1 + 2, rY + 4.5); 
+        doc.setFont("Helvetica", "normal"); doc.text(getValue('grossTonnage'), c2 - 2, rY + 4.5, { align: "right" });
+        
+        doc.setFont("Helvetica", "bold"); doc.text("Pilot on Board", c2 + 2, rY + 4.5); 
+        doc.setFont("Helvetica", "normal"); doc.text(convertTo24HourPrintString(getValue('timePilotOnBoard')), 198, rY + 4.5, { align: "right" });
+
+        // Row 5
+        rY += rowH;
+        doc.setFont("Helvetica", "bold"); doc.text("LOA / Beam", 12, rY + 4.5); 
+        doc.setFont("Helvetica", "normal"); doc.text(`${getValue('loa')}m / ${getValue('beam')}m`, c1 - 2, rY + 4.5, { align: "right" });
+        
+        doc.setFont("Helvetica", "bold"); doc.text("Deadweight", c1 + 2, rY + 4.5); 
+        doc.setFont("Helvetica", "normal"); doc.text(getValue('dwt'), c2 - 2, rY + 4.5, { align: "right" });
+        
+        doc.setFont("Helvetica", "bold"); doc.text("Disembark", c2 + 2, rY + 4.5); 
+        doc.setFont("Helvetica", "normal"); doc.text(convertTo24HourPrintString(getValue('timeDisembark')), 198, rY + 4.5, { align: "right" });
+
+        // Row 6
+        rY += rowH;
+        doc.setFont("Helvetica", "bold"); doc.text("Propulsion / Spd", 12, rY + 4.5); 
+        doc.setFont("Helvetica", "normal"); doc.text(`${getValue('propulsion')} / ${getValue('speed')} kts`, c1 - 2, rY + 4.5, { align: "right" });
+        
+        doc.setFont("Helvetica", "bold"); doc.text("Build (Year)", c1 + 2, rY + 4.5); 
+        doc.setFont("Helvetica", "normal"); doc.text(getValue('buildDate'), c2 - 2, rY + 4.5, { align: "right" });
+
+        doc.setFont("Helvetica", "bold"); doc.text("Arr. Station", c2 + 2, rY + 4.5); 
+        doc.setFont("Helvetica", "normal"); doc.text(convertTo24HourPrintString(getValue('timeArrStation')), 198, rY + 4.5, { align: "right" });
+
+        // Row 7
+        rY += rowH;
+        doc.setFont("Helvetica", "bold"); doc.text("Props / Pitch", 12, rY + 4.5); 
+        doc.setFont("Helvetica", "normal"); doc.text(`${getRadio('props')} / ${getRadio('pitch')}`, c1 - 2, rY + 4.5, { align: "right" });
+        
+        doc.setFont("Helvetica", "bold"); doc.text("Bulb Bow", c1 + 2, rY + 4.5); 
+        doc.setFont("Helvetica", "normal"); doc.text(getRadio('bulbBow'), c2 - 2, rY + 4.5, { align: "right" });
+        
+        doc.setFont("Helvetica", "bold"); doc.text("Transfer By", c2 + 2, rY + 4.5); 
+        doc.setFont("Helvetica", "normal"); doc.text(getRadio('transferBy'), 198, rY + 4.5, { align: "right" });
+
+        // Row 8
+        rY += rowH;
+        doc.setFont("Helvetica", "bold"); doc.text("Rudders", 12, rY + 4.5); 
+        doc.setFont("Helvetica", "normal"); doc.text(getValue('rudders'), c1 - 2, rY + 4.5, { align: "right" });
+        
+        doc.setFont("Helvetica", "bold"); doc.text("Helo Ops", c1 + 2, rY + 4.5); 
+        doc.setFont("Helvetica", "normal"); doc.text(getValue('helo'), c2 - 2, rY + 4.5, { align: "right" });
+        
+        doc.setFont("Helvetica", "bold"); doc.text("Ballast Disch.", c2 + 2, rY + 4.5); 
+        doc.setFont("Helvetica", "normal");
+        let bNA = document.getElementById('ballastNA')?.checked;
+        doc.text(bNA ? 'N/A' : (getValue('ballastTons') ? `${getValue('ballastTons')} T` : 'None'), 198, rY + 4.5, { align: "right" });
+
+        // Row 9
+        rY += rowH;
+        doc.setFont("Helvetica", "bold"); doc.text("Thrust Config", 12, rY + 4.5); 
+        doc.setFont("Helvetica", "normal"); doc.text(`${getRadio('thrust')} (${getRadio('tPower')})`, c1 - 2, rY + 4.5, { align: "right" });
+        
+        doc.setFont("Helvetica", "bold"); doc.text("SBT / D.Hull / IG", c1 + 2, rY + 4.5); 
+        doc.setFont("Helvetica", "normal"); doc.text(`${getRadio('sbt')} / ${getRadio('doubleHull')} / ${getRadio('inertGas')}`, c2 - 2, rY + 4.5, { align: "right" });
+        
+        doc.setFont("Helvetica", "bold"); doc.text("Ballast Place", c2 + 2, rY + 4.5); 
+        doc.setFont("Helvetica", "normal"); doc.text(bNA ? 'N/A' : getRadio('ballastPlace'), 198, rY + 4.5, { align: "right" });
+
+        // Row 10
+        rY += rowH;
+        doc.setFont("Helvetica", "bold"); doc.text("Outport Dep HQ", 12, rY + 4.5); 
+        doc.setFont("Helvetica", "normal"); doc.text(convertTo24HourPrintString(getValue('timeOutportDep')), c1 - 2, rY + 4.5, { align: "right" });
+        
+        doc.setFont("Helvetica", "bold"); doc.text("Outport Arr HQ", c1 + 2, rY + 4.5); 
+        doc.setFont("Helvetica", "normal"); doc.text(convertTo24HourPrintString(getValue('timeOutportArr')), c2 - 2, rY + 4.5, { align: "right" });
+        
+        doc.setFont("Helvetica", "bold"); doc.text("I.T. Cert (69)", c2 + 2, rY + 4.5); 
+        doc.setFont("Helvetica", "normal"); doc.text(getRadio('itCert'), 198, rY + 4.5, { align: "right" });
+
+        // Row 11 (DURATION LOG TEXT OUTPUTS)
+        rY += rowH;
+        doc.setFont("Helvetica", "bold"); doc.text("Delays (H:MM)", 12, rY + 4.5); 
+        doc.setFont("Helvetica", "normal"); doc.text(getValue('delays'), c1 - 2, rY + 4.5, { align: "right" });
+        
+        doc.setFont("Helvetica", "bold"); doc.text("Standby (H:MM)", c1 + 2, rY + 4.5); 
+        doc.setFont("Helvetica", "normal"); doc.text(getValue('standby'), c2 - 2, rY + 4.5, { align: "right" });
+        
+        doc.setFont("Helvetica", "bold"); doc.text("Cancellation", c2 + 2, rY + 4.5); 
+        doc.setFont("Helvetica", "normal"); doc.text(convertTo24HourPrintString(getValue('cancellation')), 198, rY + 4.5, { align: "right" });
+
+        // --- COMMENTS FIELD BOX ---
+        doc.line(10, remarksTopY, 200, remarksTopY);
+        doc.line(10, remarksTopY + 25, 200, remarksTopY + 25);
+        
+        doc.setFont("Helvetica", "bold"); doc.text("Comments & Operational Remarks:", 12, remarksTopY + 5); 
+        doc.setFont("Helvetica", "normal");
+        const splitTextLines = doc.splitTextToSize(getValue('comments') || 'No additional remarks entered.', 180);
+        doc.text(splitTextLines, 12, remarksTopY + 11);
+
+        doc.setFont("Helvetica", "bold"); 
+        doc.text("I certify that the Pilot performed his/her duties to my satisfaction", 12, certTextY);
+
+        // --- SIGNATURE BLOCK SECTION ---
+        doc.line(10, sigTopY, 200, sigTopY); 
+        doc.line(105, sigTopY, 105, absoluteFrameBottomY);   
+        
+        doc.setFont("Helvetica", "bold");
+        doc.text("Master Name: " + getValue('masterName'), 12, sigTopY + 6); doc.text("Signature of Master", 12, sigTopY + 11);
+        doc.text("Lead Pilot Name: " + getValue('pilotName1'), 107, sigTopY + 6); doc.text("Signature of Pilot 1 Only", 107, sigTopY + 11);
+
+        if (masterPad && !masterPad.isEmpty()) doc.addImage(masterPad.toDataURL(), 'PNG', 12, sigTopY + 13, 85, 16);
+        if (pilotPad && !pilotPad.isEmpty()) doc.addImage(pilotPad.toDataURL(), 'PNG', 107, sigTopY + 13, 85, 16);
+
+        const targetVessel = getValue('vesselName') || 'Vessel';
+        const formattedFileName = `Pilotage_Certificate_${targetVessel.replace(/\s+/g, '_')}.pdf`;
+
+        if (dispatchEmail) {
+          // Try the Web Share API first - on supported browsers (mostly
+          // mobile) this opens the native Share sheet with the PDF already
+          // attached, so the user just picks Mail / WhatsApp / etc.
+          const pdfBlob = doc.output('blob');
+          const pdfFile = new File([pdfBlob], formattedFileName, { type: 'application/pdf' });
+          const shareData = {
+            files: [pdfFile],
+            title: `Pilotage Transit - ${targetVessel}`,
+            text: `Pilotage transit log grid certificate for ${targetVessel}.`
+          };
+
+          if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+            try {
+              await navigator.share(shareData);
+              return; // shared successfully (or user cancelled) - nothing else to do
+            } catch (err) {
+              if (err && err.name === 'AbortError') return; // user cancelled the share sheet
+              // fall through to the download + mailto fallback below
+            }
+          }
+
+          // Fallback for browsers without file-sharing support (mostly desktop):
+          // download the PDF, then open a mail compose with a note to attach it.
+          doc.save(formattedFileName);
+          const bodyMsg = `Pilotage transit log grid certificate for ${targetVessel} has been downloaded - please attach it from your Downloads folder before sending.`;
+          window.location.href = `mailto:?subject=${encodeURIComponent("Pilotage Transit - " + targetVessel)}&body=${encodeURIComponent(bodyMsg)}`;
+          return;
+        }
+
+        doc.save(formattedFileName);
+      } catch (err) {
+        showAppAlert("Render Pipeline Crash: " + err.message, "PDF Generation Error");
+      }
+    }
+    // Register the service worker so the app shell (HTML/CSS/JS/icons) is
+    // cached and the app opens with zero connectivity after the first visit.
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./service-worker.js').catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>
