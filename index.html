@@ -50,15 +50,20 @@
     /* ---- Theme toggle button (header) ---- */
     #theme-toggle { line-height: 1; }
 
-    /* ---- Bottom tab bar ---- */
+    /* ---- Bottom tab bar: horizontally scrollable so items keep a
+       comfortable fixed width instead of being squeezed to fit ---- */
     #bottom-tabs {
       position: fixed; left: 0; right: 0; bottom: 0; z-index: 70;
-      display: flex; border-top: 1px solid var(--tabbar-border, #334155);
+      display: flex; overflow-x: auto; -webkit-overflow-scrolling: touch;
+      scroll-snap-type: x proximity; scrollbar-width: none;
+      border-top: 1px solid var(--tabbar-border, #334155);
     }
+    #bottom-tabs::-webkit-scrollbar { display: none; }
     [data-theme="light"] #bottom-tabs { --tabbar-border: #dde3ea; }
     .tab-btn {
-      flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
-      gap: 2px; padding: 6px 2px 8px; background: transparent; border: none;
+      flex: 0 0 auto; min-width: 78px; scroll-snap-align: start;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 2px; padding: 6px 10px 8px; background: transparent; border: none;
       color: #94a3b8; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em;
     }
     .tab-btn.active { color: #60a5fa; }
@@ -66,13 +71,13 @@
     [data-theme="light"] .tab-btn.active { color: #0a3d62; }
     .tab-icon { font-size: 18px; line-height: 1; }
 
-    /* ---- Fixed action-button run block, sits above the tab bar ---- */
-    #run-block { position: fixed; left: 0; right: 0; bottom: 54px; z-index: 65; padding: 8px 12px; }
+    /* Save/Share sit in the same bar as the tabs but are actions, not
+       navigation — a divider and a distinct accent color set them apart. */
+    .tab-btn-action { border-left: 1px solid #334155; color: #60a5fa; }
+    [data-theme="light"] .tab-btn-action { border-left-color: #dde3ea; color: #0a3d62; }
 
-    /* #run-block and #bottom-tabs are siblings of <main>, not descendants,
-       so the `main`-scoped overrides above don't reach them — theme them
-       directly here instead. */
-    [data-theme="light"] #run-block.bg-slate-900 { background-color: #f4f6f9; }
+    /* #bottom-tabs is a sibling of <main>, not a descendant, so the
+       `main`-scoped overrides above don't reach it — theme it directly. */
     [data-theme="light"] #bottom-tabs.bg-slate-800 { background-color: #ffffff; }
   </style>
 </head>
@@ -127,7 +132,7 @@
     </div>
   </header>
 
-  <main class="max-w-xl mx-auto p-3 space-y-4" style="padding-bottom: 130px;">
+  <main class="max-w-xl mx-auto p-3 space-y-4" style="padding-bottom: 70px;">
 
     <!-- SECTION 1: CORE VOYAGE LOGISTICS -->
     <section id="tab-voyage" class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-md space-y-3">
@@ -521,7 +526,7 @@
 
     <!-- SECTION 4: ATTESTATION AND SIGNATURES -->
     <section id="tab-attestation" class="hidden bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-md space-y-4 text-right">
-      <h2 class="text-blue-400 font-bold text-sm uppercase tracking-wider border-b border-slate-700 pb-1 text-left">4. Verification & Attestation</h2>
+      <h2 class="text-blue-400 font-bold text-sm uppercase tracking-wider border-b border-slate-700 pb-1 text-left">4. Verification & Signatures</h2>
       
       <div>
         <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Master's Name (Print Entry Above Signature)</label>
@@ -555,19 +560,10 @@
       </div>
     </section>
 
-    <!-- BUTTON RUN BLOCK: fixed above the tab bar, reachable from every tab -->
-    <section id="run-block" class="grid grid-cols-2 gap-3 bg-slate-900">
-      <button type="button" onclick="compileCertificatePDF(false)" class="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-xl font-bold text-sm uppercase tracking-wider shadow-md cursor-pointer transition-all">
-        📥 Save Certificate (Local)
-      </button>
-      <button type="button" onclick="compileCertificatePDF(true)" class="w-full bg-slate-700 hover:bg-slate-600 text-white py-3 rounded-xl font-bold text-sm uppercase tracking-wider shadow-md cursor-pointer transition-all">
-        📤 Share / Send Certificate
-      </button>
-    </section>
-
   </main>
 
-  <!-- Bottom tab bar: switches which of the 4 sections above is visible -->
+  <!-- Bottom bar: tabs switch which of the 4 sections above is visible;
+       Save/Share are actions, not tabs, set off by a divider. -->
   <nav id="bottom-tabs" class="bg-slate-800">
     <button type="button" class="tab-btn" data-tab="voyage" onclick="switchTab('voyage')">
       <span class="tab-icon">🧭</span><span class="tab-label">Voyage</span>
@@ -579,7 +575,13 @@
       <span class="tab-icon">⏱️</span><span class="tab-label">Timings</span>
     </button>
     <button type="button" class="tab-btn" data-tab="attestation" onclick="switchTab('attestation')">
-      <span class="tab-icon">✍️</span><span class="tab-label">Attestation</span>
+      <span class="tab-icon">✍️</span><span class="tab-label">Signatures</span>
+    </button>
+    <button type="button" class="tab-btn tab-btn-action" onclick="compileCertificatePDF(false)">
+      <span class="tab-icon">📥</span><span class="tab-label">Save</span>
+    </button>
+    <button type="button" class="tab-btn tab-btn-action" onclick="compileCertificatePDF(true)">
+      <span class="tab-icon">📤</span><span class="tab-label">Share</span>
     </button>
   </nav>
 
@@ -734,6 +736,9 @@
         const isActive = id === tabId;
         section.classList.toggle('hidden', !isActive);
         if (btn) btn.classList.toggle('active', isActive);
+        // The tab bar now scrolls horizontally, so bring the newly active
+        // tab into view in case it's currently scrolled off-screen.
+        if (isActive && btn) btn.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
       });
       if (tabId === 'attestation') {
         // The Attestation tab starts hidden, so signature_pad's canvases are
