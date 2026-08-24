@@ -197,10 +197,11 @@
 
       <div>
         <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Vessel Name</label>
-        <div class="flex gap-1">
-          <select id="vesselName" onchange="onVesselSelect('vesselName')" class="flex-1 p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-base focus:outline-none text-right font-bold"></select>
-          <button type="button" onclick="addNewVesselPrompt()" class="px-3 bg-slate-600 rounded-lg text-base font-bold">+</button>
-          <button type="button" onclick="deleteActiveVessel()" class="px-3 bg-rose-950 border border-rose-800 rounded-lg text-sm font-bold text-rose-400">×</button>
+        <select id="vesselName" onchange="onVesselSelect('vesselName')" class="w-full p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-base focus:outline-none text-right font-bold"></select>
+        <div class="flex gap-1 mt-1">
+          <button type="button" onclick="editSelectedVessel()" class="flex-1 py-1.5 bg-slate-600 rounded-lg text-xs font-bold uppercase">✏️ Edit</button>
+          <button type="button" onclick="newVesselEntry()" class="flex-1 py-1.5 bg-blue-600 rounded-lg text-xs font-bold uppercase text-white">＋ New</button>
+          <button type="button" onclick="deleteActiveVessel()" class="px-3 py-1.5 bg-rose-950 border border-rose-800 rounded-lg text-xs font-bold text-rose-400">× Delete</button>
         </div>
       </div>
 
@@ -229,11 +230,12 @@
       <div id="specs-drawer" class="space-y-3">
         <div>
           <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Vessel Name</label>
-          <div class="flex gap-1">
-            <select id="vesselNameSpecs" onchange="onVesselSelect('vesselNameSpecs')" class="flex-1 p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-base focus:outline-none text-right font-bold"></select>
-            <button type="button" onclick="saveVesselDetails()" class="px-3 bg-blue-600 rounded-lg text-sm font-bold text-white whitespace-nowrap">💾 Save</button>
+          <select id="vesselNameSpecs" onchange="onVesselSelect('vesselNameSpecs')" class="w-full p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-base focus:outline-none text-right font-bold"></select>
+          <div class="flex gap-1 mt-1">
+            <button type="button" onclick="switchTab('voyage')" class="flex-1 py-2 bg-slate-600 rounded-lg text-sm font-bold uppercase">← Cancel</button>
+            <button type="button" onclick="saveVesselDetails()" class="flex-1 py-2 bg-blue-600 rounded-lg text-sm font-bold text-white uppercase">💾 Save</button>
           </div>
-          <p class="text-xs text-slate-500 mt-1 text-left">Saves the fields below against this vessel name — separate from the certificate Save/Share buttons. Saved vessels appear on the Voyage tab.</p>
+          <p class="text-xs text-slate-500 mt-1 text-left">Saves the fields below against this vessel name and returns to Voyage — separate from the certificate Save/Share buttons.</p>
         </div>
 
         <div class="grid grid-cols-2 gap-2">
@@ -579,9 +581,6 @@
   <nav id="bottom-tabs" class="bg-slate-800">
     <button type="button" class="tab-btn" data-tab="voyage" onclick="switchTab('voyage')">
       <span class="tab-icon">🧭</span><span class="tab-label">Voyage</span>
-    </button>
-    <button type="button" class="tab-btn" data-tab="vessel" onclick="switchTab('vessel')">
-      <span class="tab-icon">🚢</span><span class="tab-label">Vessel</span>
     </button>
     <button type="button" class="tab-btn" data-tab="timings" onclick="switchTab('timings')">
       <span class="tab-icon">⏱️</span><span class="tab-label">Timings</span>
@@ -1033,7 +1032,7 @@
 
     function renderAlphabeticalVessels() {
       vesselList.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
-      VESSEL_NAME_SELECT_IDS.forEach(id => renderSelectMenuOptions(id, vesselList.map(v => v.name)));
+      VESSEL_NAME_SELECT_IDS.forEach(id => renderSelectMenuOptions(id, ["", ...vesselList.map(v => v.name)]));
     }
 
     function setVesselNameSelects(name) {
@@ -1091,7 +1090,7 @@
 
     // Save button on the Vessel tab: saves against whichever vessel is
     // currently selected (after confirming), or prompts for a new name if
-    // none is selected yet.
+    // none is selected yet — then returns to the Voyage tab.
     async function saveVesselDetails() {
       const name = document.getElementById('vesselNameSpecs').value;
       if (name) {
@@ -1102,6 +1101,32 @@
         if (!v || !v.trim()) return;
         await saveVesselProfile(v.trim());
       }
+      switchTab('voyage');
+    }
+
+    // "Edit" on the Voyage tab: jumps to the Vessel tab to edit the
+    // currently selected vessel's particulars (already loaded in the
+    // background by onVesselSelect). Saving there returns here.
+    function editSelectedVessel() {
+      const name = document.getElementById('vesselName').value;
+      if (!name) {
+        showAppAlert('Select a saved vessel first, or use "+ New" to add one.', 'Edit Vessel');
+        return;
+      }
+      switchTab('vessel');
+    }
+
+    // "+ New" on the Voyage tab: clears the particulars fields and vessel
+    // name, then jumps to the Vessel tab ready to enter and save a new one.
+    function newVesselEntry() {
+      setVesselNameSelects('');
+      const fields = ['imoNumber', 'grossTonnage', 'dwt', 'loa', 'beam', 'flag', 'propulsion'];
+      fields.forEach(key => {
+        const el = document.getElementById(key);
+        if (el) el.value = '';
+      });
+      updateStateBackupStore();
+      switchTab('vessel');
     }
 
     // Loads the From/To station select options for a given port, preferring
@@ -1214,18 +1239,6 @@
         return `${parts[0]}/${parts[1]}`;
       }
       return val;
-    }
-
-    async function addNewVesselPrompt() {
-      const v = await showAppPrompt("This stores the current IMO / GRT / DWT / LOA / Beam / Flag / Propulsion fields against this vessel, so selecting it next time fills them in automatically.", "Save Vessel", "Vessel name");
-      if (!v || !v.trim()) return;
-      const clean = v.trim();
-
-      const existingIdx = vesselList.findIndex(x => x.name.toLowerCase() === clean.toLowerCase());
-      if (existingIdx >= 0) {
-        if (!(await showAppConfirm(`"${clean}" is already saved. Update its stored details with the current form values?`, "Update Vessel"))) return;
-      }
-      await saveVesselProfile(clean);
     }
 
     async function deleteActiveVessel() {
