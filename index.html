@@ -130,6 +130,7 @@
     </div>
     <div class="flex items-center gap-1">
       <span class="bg-emerald-600 text-xs px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">Mobile Grid V21</span>
+      <button type="button" onclick="startNewChit()" title="Start a new certificate (clears fields)" class="bg-slate-700 hover:bg-slate-600 text-xs px-2 py-1 rounded-full font-bold">🆕</button>
       <button id="theme-toggle" type="button" onclick="toggleTheme()" title="Toggle light/dark theme" class="bg-slate-700 hover:bg-slate-600 text-xs px-2 py-1 rounded-full font-bold">🌙</button>
       <button type="button" onclick="promptChangePin()" title="Change PIN" class="bg-slate-700 hover:bg-slate-600 text-xs px-2 py-1 rounded-full font-bold">⚙️</button>
     </div>
@@ -1044,42 +1045,78 @@
       });
     }
 
-    // Populates the main ship-particular fields from the selected vessel's
-    // saved profile, and keeps the Voyage-tab and Vessel-tab name selects in
-    // sync with each other. Draft (fore/aft) is deliberately left untouched
-    // since that changes voyage-to-voyage, not a fixed vessel particular.
+    // All the fields on the Vessel Specifications tab that are a FIXED
+    // property of the vessel itself (so belong in a saved vessel profile,
+    // and should reset to a clean default when starting a new vessel).
+    // Draft (fore/aft) and the Ballast Entry block are deliberately
+    // excluded — those describe this voyage's loading condition, not the
+    // vessel, and change trip-to-trip.
+    const VESSEL_TEXT_FIELDS = ['imoNumber', 'grossTonnage', 'dwt', 'loa', 'beam', 'flag', 'propulsion', 'callSign', 'buildDate', 'speed'];
+    const VESSEL_ENUM_FIELDS = ['helo', 'rudders']; // <select>s with a fixed option list, no blank option
+    const VESSEL_RADIO_GROUPS = ['itCert', 'props', 'pitch', 'thrust', 'tPower', 'bulbBow', 'doubleHull', 'inertGas', 'sbt'];
+    // Matches each enum/radio field's default option in the static HTML —
+    // used both to reset for a new vessel and as a fallback when an older
+    // saved vessel profile predates one of these fields.
+    const VESSEL_ENUM_DEFAULTS = {
+      helo: 'Yes', rudders: 'Single', itCert: 'Yes', props: 'Single', pitch: 'Fixed',
+      thrust: 'None', tPower: 'N/A', bulbBow: 'Yes', doubleHull: 'Yes', inertGas: 'Yes', sbt: 'Yes'
+    };
+
+    function getVesselRadioValue(group) {
+      const checked = document.querySelector(`input[name="${group}"]:checked`);
+      return checked ? checked.value : '';
+    }
+    function setVesselRadioValue(group, value) {
+      const input = document.querySelector(`input[name="${group}"][value="${CSS.escape(value)}"]`);
+      if (input) input.checked = true;
+    }
+
+    // Applies (or clears, if `vessel` is null) a vessel's saved particulars
+    // to the Vessel Specifications fields. Shared by onVesselSelect (loads
+    // the picked vessel) and newVesselEntry (loads nothing, i.e. defaults)
+    // so both paths are guaranteed to handle the exact same field list.
+    function applyVesselParticulars(vessel) {
+      VESSEL_TEXT_FIELDS.forEach(key => {
+        const el = document.getElementById(key);
+        if (el) el.value = (vessel && vessel[key]) ? vessel[key] : '';
+      });
+      VESSEL_ENUM_FIELDS.forEach(key => {
+        const el = document.getElementById(key);
+        if (el) el.value = (vessel && vessel[key]) ? vessel[key] : VESSEL_ENUM_DEFAULTS[key];
+      });
+      // Restore thrust first and re-run its enable/disable logic before
+      // restoring tPower — evaluateThrustLogic() force-sets tPower when
+      // thrust is "None" and would otherwise clobber a just-restored value.
+      setVesselRadioValue('thrust', (vessel && vessel.thrust) || VESSEL_ENUM_DEFAULTS.thrust);
+      evaluateThrustLogic();
+      VESSEL_RADIO_GROUPS.forEach(group => {
+        if (group === 'thrust') return;
+        setVesselRadioValue(group, (vessel && vessel[group]) || VESSEL_ENUM_DEFAULTS[group]);
+      });
+    }
+
+    // Populates the Vessel Specifications fields from the selected vessel's
+    // saved profile, and keeps the Voyage-tab and Vessel-tab name fields in
+    // sync with each other.
     function onVesselSelect(sourceId) {
       const name = document.getElementById(sourceId || 'vesselName').value;
       setVesselNameSelects(name);
       const vessel = vesselList.find(v => v.name === name);
-      const fields = ['imoNumber', 'grossTonnage', 'dwt', 'loa', 'beam', 'flag', 'propulsion'];
-      for (const key of fields) {
-        const el = document.getElementById(key);
-        // Always sync to the newly selected vessel, clearing any field it
-        // has no saved value for — otherwise a field left blank on the
-        // selected vessel just keeps showing whatever the previous
-        // vessel (or a manual edit) had left in it.
-        if (el) el.value = (vessel && vessel[key]) ? vessel[key] : '';
-      }
+      applyVesselParticulars(vessel);
       updateStateBackupStore();
     }
 
-    // Saves the current IMO/GRT/DWT/LOA/Beam/Flag/Propulsion fields against
-    // a vessel name, updating an existing saved vessel or creating a new
-    // one. Shared by the Voyage tab's "+" prompt and the Vessel tab's Save
-    // button — separate from the bottom bar's Save/Share, which saves the
-    // whole certificate rather than a reusable vessel profile.
+    // Saves the current vessel-particular fields against a vessel name,
+    // updating an existing saved vessel or creating a new one. Shared by
+    // the Vessel tab's Save button — separate from the bottom bar's
+    // Save/Share, which saves the whole certificate rather than a reusable
+    // vessel profile.
     async function saveVesselProfile(name) {
-      const profile = {
-        name,
-        imoNumber: getVal('imoNumber'),
-        grossTonnage: getVal('grossTonnage'),
-        dwt: getVal('dwt'),
-        loa: getVal('loa'),
-        beam: getVal('beam'),
-        flag: getVal('flag'),
-        propulsion: getVal('propulsion')
-      };
+      const profile = { name };
+      VESSEL_TEXT_FIELDS.forEach(key => { profile[key] = getVal(key); });
+      VESSEL_ENUM_FIELDS.forEach(key => { profile[key] = getVal(key); });
+      VESSEL_RADIO_GROUPS.forEach(group => { profile[group] = getVesselRadioValue(group); });
+
       const existingIdx = vesselList.findIndex(x => x.name.toLowerCase() === name.toLowerCase());
       if (existingIdx >= 0) vesselList[existingIdx] = profile;
       else vesselList.push(profile);
@@ -1099,7 +1136,7 @@
         if (!(await showAppConfirm(`Update "${name}"'s saved particulars with the current form values?`, "Save Vessel"))) return;
         await saveVesselProfile(name);
       } else {
-        const v = await showAppPrompt("This stores the current IMO / GRT / DWT / LOA / Beam / Flag / Propulsion fields against this vessel, so selecting it next time fills them in automatically.", "Save Vessel", "Vessel name");
+        const v = await showAppPrompt("This stores the current vessel particulars (IMO, tonnage, dimensions, propulsion, hull/thruster details, etc.) against this vessel, so selecting it next time fills them in automatically.", "Save Vessel", "Vessel name");
         if (!v || !v.trim()) return;
         await saveVesselProfile(v.trim());
       }
@@ -1122,11 +1159,7 @@
     // name, then jumps to the Vessel tab ready to enter and save a new one.
     function newVesselEntry() {
       setVesselNameSelects('');
-      const fields = ['imoNumber', 'grossTonnage', 'dwt', 'loa', 'beam', 'flag', 'propulsion'];
-      fields.forEach(key => {
-        const el = document.getElementById(key);
-        if (el) el.value = '';
-      });
+      applyVesselParticulars(null);
       updateStateBackupStore();
       switchTab('vessel');
     }
@@ -1380,6 +1413,19 @@
         if (s.movement) toggleRemLogic(s.movement);
         if (s.thrust) evaluateThrustLogic();
       } catch(e) {}
+    }
+
+    // "🆕" header button: clears this certificate's fields to start a new
+    // one, without touching the saved vessel library, pilot roster, port
+    // station lists, PIN, or theme choice — those live under separate
+    // storage keys, untouched by clearing pnorth_v21_state. Reloading (
+    // rather than hand-resetting every field) reuses the same well-tested
+    // "no saved state" defaults that already run on a fresh page load, so
+    // there's no separate reset list to keep in sync as fields change.
+    async function startNewChit() {
+      if (!(await showAppConfirm("Clear this certificate's fields to start a new one? Saved vessels, pilot names, and station lists are kept.", "New Certificate"))) return;
+      try { await localforage.removeItem('pnorth_v21_state'); } catch(e) {}
+      location.reload();
     }
 
     // Loads an image and resolves once it's actually decoded (or after a
