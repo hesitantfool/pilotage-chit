@@ -40,12 +40,15 @@
     [data-theme="light"] main .text-white:not(.bg-blue-600) { color: #12161b; }
     [data-theme="light"] main .text-blue-400 { color: #0a3d62; }
     [data-theme="light"] main .text-blue-300 { color: #1d4ed8; }
-    /* Selected radio "pill" state keeps a dark navy background in both
-       themes (see below) but its label text otherwise inherits the new
-       dark body text color in light mode, which would be unreadable
-       against that dark pill — force it back to white. */
-    [data-theme="light"] main .has-\[\:checked\]\:bg-blue-900:has(:checked),
-    [data-theme="light"] main .has-\[\:checked\]\:bg-blue-950:has(:checked) { color: #ffffff; }
+    /* Selected radio "pill" state must keep its dark navy background and
+       white text in light mode too. Both need to be re-asserted here: the
+       `main .bg-slate-700 → white` override above is (unintentionally)
+       higher specificity than Tailwind's own `has-checked:bg-blue-900`
+       rule (an extra `main` type-selector edges it out), so without this,
+       pressing a pill flips its highlight back to white while the text
+       stays white from a color-only fix — invisible text on white. */
+    [data-theme="light"] main .has-\[\:checked\]\:bg-blue-900:has(:checked) { background-color: #1e3a8a; color: #ffffff; }
+    [data-theme="light"] main .has-\[\:checked\]\:bg-blue-950:has(:checked) { background-color: #172554; color: #ffffff; }
 
     /* ---- Theme toggle button (header) ---- */
     #theme-toggle { line-height: 1; }
@@ -195,7 +198,7 @@
       <div>
         <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Vessel Name</label>
         <div class="flex gap-1">
-          <select id="vesselName" onchange="onVesselSelect()" class="flex-1 p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-base focus:outline-none text-right font-bold"></select>
+          <select id="vesselName" onchange="onVesselSelect('vesselName')" class="flex-1 p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-base focus:outline-none text-right font-bold"></select>
           <button type="button" onclick="addNewVesselPrompt()" class="px-3 bg-slate-600 rounded-lg text-base font-bold">+</button>
           <button type="button" onclick="deleteActiveVessel()" class="px-3 bg-rose-950 border border-rose-800 rounded-lg text-sm font-bold text-rose-400">×</button>
         </div>
@@ -224,6 +227,15 @@
       <h2 class="text-blue-400 font-bold text-sm uppercase tracking-wider border-b border-slate-700 pb-1">2. Vessel Specifications (Particulars)</h2>
 
       <div id="specs-drawer" class="space-y-3">
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Vessel Name</label>
+          <div class="flex gap-1">
+            <select id="vesselNameSpecs" onchange="onVesselSelect('vesselNameSpecs')" class="flex-1 p-2 rounded-lg bg-slate-700 border border-slate-600 text-white text-base focus:outline-none text-right font-bold"></select>
+            <button type="button" onclick="saveVesselDetails()" class="px-3 bg-blue-600 rounded-lg text-sm font-bold text-white whitespace-nowrap">💾 Save</button>
+          </div>
+          <p class="text-xs text-slate-500 mt-1 text-left">Saves the fields below against this vessel name — separate from the certificate Save/Share buttons. Saved vessels appear on the Voyage tab.</p>
+        </div>
+
         <div class="grid grid-cols-2 gap-2">
           <div>
             <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 text-left">Draft Fore (xx.x)</label>
@@ -956,6 +968,12 @@
         renderSelectMenuOptions('toLoc', portStations[fallbackPort].toLoc);
       }
 
+      // A state snapshot saved before the Vessel-tab name select existed
+      // won't have a value for it yet — sync it from the Voyage tab's
+      // (correctly restored) selection so both stay consistent from the
+      // first load onward.
+      setVesselNameSelects(document.getElementById('vesselName').value);
+
       syncPilotLabel(document.getElementById('pilotName1').value);
       evaluateThrustLogic();
 
@@ -1009,16 +1027,29 @@
       if(el) el.innerHTML = arr.map(v => `<option value="${v}">${v === "" ? "-- None --" : v}</option>`).join('');
     }
 
+    // Vessel name appears as two selects (Voyage tab and Vessel tab) that
+    // must always show the same selection.
+    const VESSEL_NAME_SELECT_IDS = ['vesselName', 'vesselNameSpecs'];
+
     function renderAlphabeticalVessels() {
       vesselList.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
-      renderSelectMenuOptions('vesselName', vesselList.map(v => v.name));
+      VESSEL_NAME_SELECT_IDS.forEach(id => renderSelectMenuOptions(id, vesselList.map(v => v.name)));
+    }
+
+    function setVesselNameSelects(name) {
+      VESSEL_NAME_SELECT_IDS.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = name;
+      });
     }
 
     // Populates the main ship-particular fields from the selected vessel's
-    // saved profile. Draft (fore/aft) is deliberately left untouched since
-    // that changes voyage-to-voyage, not a fixed vessel particular.
-    function onVesselSelect() {
-      const name = document.getElementById('vesselName').value;
+    // saved profile, and keeps the Voyage-tab and Vessel-tab name selects in
+    // sync with each other. Draft (fore/aft) is deliberately left untouched
+    // since that changes voyage-to-voyage, not a fixed vessel particular.
+    function onVesselSelect(sourceId) {
+      const name = document.getElementById(sourceId || 'vesselName').value;
+      setVesselNameSelects(name);
       const vessel = vesselList.find(v => v.name === name);
       const fields = ['imoNumber', 'grossTonnage', 'dwt', 'loa', 'beam', 'flag', 'propulsion'];
       for (const key of fields) {
@@ -1030,6 +1061,47 @@
         if (el) el.value = (vessel && vessel[key]) ? vessel[key] : '';
       }
       updateStateBackupStore();
+    }
+
+    // Saves the current IMO/GRT/DWT/LOA/Beam/Flag/Propulsion fields against
+    // a vessel name, updating an existing saved vessel or creating a new
+    // one. Shared by the Voyage tab's "+" prompt and the Vessel tab's Save
+    // button — separate from the bottom bar's Save/Share, which saves the
+    // whole certificate rather than a reusable vessel profile.
+    async function saveVesselProfile(name) {
+      const profile = {
+        name,
+        imoNumber: getVal('imoNumber'),
+        grossTonnage: getVal('grossTonnage'),
+        dwt: getVal('dwt'),
+        loa: getVal('loa'),
+        beam: getVal('beam'),
+        flag: getVal('flag'),
+        propulsion: getVal('propulsion')
+      };
+      const existingIdx = vesselList.findIndex(x => x.name.toLowerCase() === name.toLowerCase());
+      if (existingIdx >= 0) vesselList[existingIdx] = profile;
+      else vesselList.push(profile);
+
+      try { await localforage.setItem('pnorth_v21_vessels', vesselList); } catch(e) {}
+      renderAlphabeticalVessels();
+      setVesselNameSelects(name);
+      updateStateBackupStore();
+    }
+
+    // Save button on the Vessel tab: saves against whichever vessel is
+    // currently selected (after confirming), or prompts for a new name if
+    // none is selected yet.
+    async function saveVesselDetails() {
+      const name = document.getElementById('vesselNameSpecs').value;
+      if (name) {
+        if (!(await showAppConfirm(`Update "${name}"'s saved particulars with the current form values?`, "Save Vessel"))) return;
+        await saveVesselProfile(name);
+      } else {
+        const v = await showAppPrompt("This stores the current IMO / GRT / DWT / LOA / Beam / Flag / Propulsion fields against this vessel, so selecting it next time fills them in automatically.", "Save Vessel", "Vessel name");
+        if (!v || !v.trim()) return;
+        await saveVesselProfile(v.trim());
+      }
     }
 
     // Loads the From/To station select options for a given port, preferring
@@ -1149,29 +1221,11 @@
       if (!v || !v.trim()) return;
       const clean = v.trim();
 
-      const profile = {
-        name: clean,
-        imoNumber: getVal('imoNumber'),
-        grossTonnage: getVal('grossTonnage'),
-        dwt: getVal('dwt'),
-        loa: getVal('loa'),
-        beam: getVal('beam'),
-        flag: getVal('flag'),
-        propulsion: getVal('propulsion')
-      };
-
       const existingIdx = vesselList.findIndex(x => x.name.toLowerCase() === clean.toLowerCase());
       if (existingIdx >= 0) {
         if (!(await showAppConfirm(`"${clean}" is already saved. Update its stored details with the current form values?`, "Update Vessel"))) return;
-        vesselList[existingIdx] = profile;
-      } else {
-        vesselList.push(profile);
       }
-
-      try { await localforage.setItem('pnorth_v21_vessels', vesselList); } catch(e) {}
-      renderAlphabeticalVessels();
-      document.getElementById('vesselName').value = clean;
-      updateStateBackupStore();
+      await saveVesselProfile(clean);
     }
 
     async function deleteActiveVessel() {
@@ -1181,7 +1235,11 @@
         vesselList = vesselList.filter(item => item.name !== el.value);
         try { await localforage.setItem('pnorth_v21_vessels', vesselList); } catch(e) {}
         renderAlphabeticalVessels();
-        updateStateBackupStore();
+        // Rebuilding the selects' option lists resets their value to
+        // whichever vessel now sorts first, so re-sync the particulars
+        // fields to match rather than leaving the deleted vessel's data in
+        // place against a different, unrelated selection.
+        onVesselSelect('vesselName');
       }
     }
 
